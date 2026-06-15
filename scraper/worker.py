@@ -23,6 +23,7 @@ from config.settings import settings
 UPLOADS_DIR = Path("/tmp/uploads")
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger("worker")
 
 app = FastAPI(title="FolhetoSmart Scraper Worker", version="1.0.0")
 
@@ -64,11 +65,17 @@ async def process_pdf(
     file: UploadFile = File(...),
     supermarket_slug: str = Form(...),
     sync_run_id: str | None = Form(None),
+    drive_filename: str | None = Form(None),
 ) -> dict:
     """Processa um folheto PDF carregado manualmente (Fix 3).
 
     O backend valida e reenvia o ficheiro; aqui guardamos a nossa cópia e
     corremos OCR + AI matcher em background.
+
+    Se `drive_filename` vier preenchido (upload do ADMIN), guardamos primeiro o
+    PDF no Google Drive com esse nome (substituindo se já existir) e devolvemos
+    o `drive_file_id` — feito de forma síncrona porque é rápido e o backend
+    precisa do id na resposta.
     """
     data = await file.read()
     if not data.startswith(b"%PDF"):
@@ -77,6 +84,15 @@ async def process_pdf(
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     target = UPLOADS_DIR / f"{supermarket_slug}_{int(time.time())}.pdf"
     target.write_bytes(data)
+
+    drive_file_id = None
+    if drive_filename:
+        from storage.gdrive_storage import drive_storage
+
+        if drive_storage.is_configured():
+            drive_file_id = drive_storage.upload_pdf(target, drive_filename, replace=True)
+        else:
+            logger.warning("Drive não configurado — folheto não guardado no Drive")
 
     background.add_task(
         pipeline.run_pdf_sync,
@@ -89,4 +105,5 @@ async def process_pdf(
         "sync_run_id": sync_run_id,
         "supermarket": supermarket_slug,
         "pdf": target.name,
+        "drive_file_id": drive_file_id,
     }

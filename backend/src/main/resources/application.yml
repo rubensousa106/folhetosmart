@@ -3,9 +3,11 @@ spring:
     name: folhetosmart-backend
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/folhetosmart}
-    username: ${SPRING_DATASOURCE_USERNAME:folheto}
-    password: ${SPRING_DATASOURCE_PASSWORD:folheto}
+    # Precedência: SPRING_DATASOURCE_URL (docker-compose) > DB_* (Render, que
+    # injeta host/port/database/user/password da BD) > defaults locais.
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:folhetosmart}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USER:folheto}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:folheto}}
 
   jpa:
     hibernate:
@@ -25,13 +27,6 @@ spring:
     property-naming-strategy: SNAKE_CASE
     default-property-inclusion: non_null
 
-  data:
-    redis:
-      # Rate limiting distribuído (ver RateLimitFilter).
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-
   servlet:
     multipart:
       # Upload manual de folhetos em PDF (Fix 3).
@@ -40,6 +35,9 @@ spring:
 
 server:
   port: 8080
+  # Atrás de proxy com TLS no edge (Render, nginx): honra o X-Forwarded-Proto,
+  # senão require-https=true vê HTTP e entra em loop de redirect.
+  forward-headers-strategy: framework
 
 # --- Configuração da aplicação ---
 folheto:
@@ -56,6 +54,15 @@ folheto:
   scraper:
     # URL do worker Python que corre o pipeline de scraping + IA.
     url: ${FOLHETO_SCRAPER_URL:http://localhost:8090}
+  admin:
+    # Conta de administrador criada/promovida no arranque (ver AdminBootstrap).
+    # No Render define-se no painel; em dev local fica vazio.
+    email: ${FOLHETO_ADMIN_EMAIL:}
+    password: ${FOLHETO_ADMIN_PASSWORD:}
+  scheduler:
+    # Cron semanal interno (SyncSchedulerJob). No Render (free) põe-se false —
+    # o processamento semanal corre no GitHub Actions. Local/docker: true.
+    enabled: ${FOLHETO_SCHEDULER_ENABLED:true}
 
 logging:
   level:

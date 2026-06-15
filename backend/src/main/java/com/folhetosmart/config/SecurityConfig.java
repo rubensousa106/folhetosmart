@@ -60,6 +60,8 @@ public class SecurityConfig {
                         // Disparar processamento (Claude API) é só ADMIN —
                         // @PreAuthorize nos métodos garante o papel.
                         .requestMatchers("/api/v1/sync/**").authenticated()
+                        // Painel de administração — só ADMIN (@PreAuthorize de classe).
+                        .requestMatchers("/api/v1/admin/**").authenticated()
                         // Geridos por utilizador autenticado
                         .requestMatchers("/api/v1/alerts/**").authenticated()
                         .requestMatchers("/api/v1/privacy/**").authenticated()

@@ -23,17 +23,6 @@ services:
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    container_name: folhetosmart-redis
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   backend:
     build:
       context: ./backend
@@ -42,17 +31,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-folhetosmart}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-folheto}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-folheto}
       FOLHETO_JWT_SECRET: ${FOLHETO_JWT_SECRET}
       FOLHETO_SCRAPER_URL: http://scraper:8090
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      # Conta de administrador criada no arranque (endpoints só-ADMIN).
+      FOLHETO_ADMIN_EMAIL: ${FOLHETO_ADMIN_EMAIL:-}
+      FOLHETO_ADMIN_PASSWORD: ${FOLHETO_ADMIN_PASSWORD:-}
     ports:
       - "8080:8080"
 

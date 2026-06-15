@@ -55,6 +55,48 @@ public class ScraperClient {
         }
     }
 
+    /** Resposta do worker a /process-pdf (contrato entre serviços). */
+    public record ProcessPdfResponse(
+            @JsonProperty("accepted") boolean accepted,
+            @JsonProperty("sync_run_id") String syncRunId,
+            @JsonProperty("drive_file_id") String driveFileId
+    ) {
+    }
+
+    /**
+     * Upload de folheto pelo ADMIN: além do OCR/matcher, o worker guarda o PDF
+     * no Google Drive com {@code driveFilename} (substitui se já existir) e
+     * devolve o id do ficheiro no Drive.
+     */
+    public String uploadFlyer(UUID syncRunId, String slug, byte[] pdfBytes, String driveFilename) {
+        ByteArrayResource pdf = new ByteArrayResource(pdfBytes) {
+            @Override
+            public String getFilename() {
+                return driveFilename;
+            }
+        };
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("file", pdf);
+        body.add("supermarket_slug", slug);
+        body.add("sync_run_id", syncRunId.toString());
+        body.add("drive_filename", driveFilename);
+
+        try {
+            ProcessPdfResponse resp = restClient.post()
+                    .uri("/process-pdf")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(body)
+                    .retrieve()
+                    .body(ProcessPdfResponse.class);
+            log.info("Folheto enviado ao worker (sync_run={}, slug={})", syncRunId, slug);
+            return resp == null ? null : resp.driveFileId();
+        } catch (Exception ex) {
+            log.error("Falha ao enviar o folheto ao worker", ex);
+            throw new ApiException(HttpStatus.BAD_GATEWAY,
+                    "Não foi possível enviar o folheto ao automatizador. Tenta novamente.");
+        }
+    }
+
     /** Reenvia um PDF carregado manualmente para o worker (OCR + matcher). */
     public void processPdf(UUID syncRunId, String slug, byte[] pdfBytes, String filename) {
         // O nome do ficheiro tem de vir do recurso para o multipart o incluir.

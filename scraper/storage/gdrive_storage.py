@@ -115,20 +115,33 @@ class GoogleDriveStorage:
         logger.info("Drive: descarregado %s", target.name)
         return target
 
-    def upload_pdf(self, local_path, filename: str) -> Optional[str]:
+    def upload_pdf(
+        self, local_path, filename: str, replace: bool = False
+    ) -> Optional[str]:
         """Faz upload de um PDF para o Drive — 1 cópia por supermercado/semana.
 
         Se já existir um ficheiro com o mesmo nome (mesmo supermercado, mesma
-        semana), NÃO duplica: ignora e devolve o id existente.
+        semana):
+        - `replace=False` (omissão): NÃO duplica — ignora e devolve o id existente;
+        - `replace=True` (upload do ADMIN): substitui o conteúdo do existente.
         """
         from googleapiclient.http import MediaFileUpload  # lazy
 
         try:
             existing = self._find_by_name(filename)
-            if existing:
+            if existing and not replace:
                 logger.info("Drive: %s já existe — não duplica", filename)
                 return existing
+
             media = MediaFileUpload(str(local_path), mimetype="application/pdf")
+            if existing:
+                # Substitui o conteúdo, mantendo o mesmo ficheiro (sem duplicar).
+                self.service.files().update(
+                    fileId=existing, media_body=media
+                ).execute()
+                logger.info("Drive: %s substituído", filename)
+                return existing
+
             meta = {"name": filename, "parents": [self.folder_id]}
             created = self.service.files().create(
                 body=meta, media_body=media, fields="id"

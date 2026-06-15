@@ -159,7 +159,7 @@ public class SyncService {
         return new SyncUploadResponse(run.getId(), "processing");
     }
 
-    private static byte[] readBytes(MultipartFile file) {
+    static byte[] readBytes(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Nenhum ficheiro recebido.");
         }
@@ -171,7 +171,7 @@ public class SyncService {
     }
 
     /** Valida content-type + magic bytes (%PDF). */
-    private static void validatePdf(MultipartFile file, byte[] bytes) {
+    static void validatePdf(MultipartFile file, byte[] bytes) {
         String contentType = file.getContentType();
         boolean typeOk = contentType == null
                 || contentType.contains("pdf")

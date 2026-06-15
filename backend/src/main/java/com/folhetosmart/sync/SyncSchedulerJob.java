@@ -3,6 +3,7 @@ package com.folhetosmart.sync;
 import com.folhetosmart.common.ApiException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -14,8 +15,12 @@ import java.time.ZoneId;
  * todos os folhetos já estão disponíveis e, se sim, dispara a sincronização
  * uma vez por dia (triggered_by = "cron"). O utilizador continua a poder
  * disparar manualmente pela app.
+ *
+ * Desativável por {@code folheto.scheduler.enabled=false}: no Render (free) o
+ * backend não tem worker, e o processamento semanal corre no GitHub Actions.
  */
 @Component
+@ConditionalOnProperty(name = "folheto.scheduler.enabled", havingValue = "true", matchIfMissing = true)
 public class SyncSchedulerJob {
 
     private static final Logger log = LoggerFactory.getLogger(SyncSchedulerJob.class);
