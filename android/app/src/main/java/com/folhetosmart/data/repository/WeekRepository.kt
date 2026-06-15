@@ -27,11 +27,13 @@ class WeekRepository(
     fun needsSync(): Boolean = prefs.needsWeeklySync()
 
     /**
-     * Sincroniza os produtos da semana se a semana mudou (ou se forçado).
-     * Devolve a lista (fresca ou da cache). Em falha de rede, usa a cache.
+     * Sincroniza os produtos da semana só quando é preciso ir ao servidor:
+     * nunca sincronizou, a cache tem mais de 1 hora, ou foi forçado (botão
+     * "Atualizar"). Caso contrário usa a cache Room (instantâneo). Em falha de
+     * rede, cai sempre para a cache.
      */
     suspend fun syncWeekProducts(force: Boolean = false): List<ProductDto> {
-        if (!force && !prefs.needsWeeklySync()) {
+        if (!force && isCacheFresh()) {
             return cachedWeekProducts()
         }
         return try {
@@ -44,6 +46,14 @@ class WeekRepository(
         }
     }
 
+    /** Cache fresca = produtos desta semana guardados há menos de 1 hora. */
+    private suspend fun isCacheFresh(): Boolean {
+        val entry = cache.get(KEY_WEEK) ?: return false
+        val sameWeek = prefs.lastSyncWeek == AppPrefs.currentWeekKey()
+        val ageMs = System.currentTimeMillis() - entry.updatedAt
+        return sameWeek && ageMs < FRESH_WINDOW_MS
+    }
+
     suspend fun cachedWeekProducts(): List<ProductDto> {
         val entry = cache.get(KEY_WEEK) ?: return emptyList()
         return gson.fromJson(entry.json, listType)
@@ -51,5 +61,6 @@ class WeekRepository(
 
     private companion object {
         const val KEY_WEEK = "week_products"
+        const val FRESH_WINDOW_MS = 60 * 60 * 1000L   // 1 hora
     }
 }

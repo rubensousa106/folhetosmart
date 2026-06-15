@@ -9,6 +9,22 @@ import java.time.temporal.TemporalAdjusters
 /** PDF escolhido pelo utilizador (mantido em memória até ao envio). */
 class PickedPdf(val label: String, val bytes: ByteArray)
 
+/** Linha de progresso por supermercado durante "Forçar sincronização". */
+data class MarketLine(
+    val name: String,
+    val label: String,
+    val done: Boolean,
+    val failed: Boolean
+)
+
+/** Progresso detalhado do processamento — só existe no ecrã Admin. */
+data class SyncProgress(
+    val doneCount: Int,
+    val totalCount: Int,
+    val etaSeconds: Int,
+    val lines: List<MarketLine>
+)
+
 /** Fases da máquina de estados do upload (Fix 5). */
 sealed interface UploadPhase {
     /** Sem PDF — ação: "Selecionar PDF". */
@@ -48,7 +64,8 @@ data class AdminUiState(
 
     // Máquina de estados do upload + "Forçar sincronização"
     val phase: UploadPhase = UploadPhase.Idle,
-    val syncing: Boolean = false
+    val syncing: Boolean = false,
+    val syncProgress: SyncProgress? = null
 ) {
     val validFrom: String get() = weekStart.format(DATE_FMT)
     val validUntil: String get() = weekStart.plusDays(6).format(DATE_FMT)

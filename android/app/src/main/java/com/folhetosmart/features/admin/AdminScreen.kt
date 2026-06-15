@@ -33,6 +33,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
@@ -123,6 +124,9 @@ fun AdminScreen(
             onUpload = viewModel::upload,
             onRetry = viewModel::retry
         )
+
+        // Progresso detalhado do processamento — só no ecrã Admin.
+        state.syncProgress?.let { SyncProgressCard(it) }
 
         FlyersStatusCard(
             state = state,
@@ -484,5 +488,55 @@ private fun displayNameOf(context: Context, uri: Uri): String? {
     }
 }
 
+/** Barra de progresso detalhada do processamento (Claude API) — só no Admin. */
+@Composable
+private fun SyncProgressCard(p: SyncProgress) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = ProcessingBg
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "🔄 A processar folhetos…",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            LinearProgressIndicator(
+                progress = { if (p.totalCount > 0) p.doneCount.toFloat() / p.totalCount else 0f },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text("${p.doneCount} de ${p.totalCount}", style = MaterialTheme.typography.bodyMedium)
+
+            p.lines.forEach { line ->
+                val mark = when {
+                    line.failed -> "✗"
+                    line.done -> "✓"
+                    else -> "…"
+                }
+                Text(
+                    "${line.name}: ${line.label} $mark",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (line.failed) ErrorRed else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            val etaLabel = when {
+                p.etaSeconds <= 0 -> "quase concluído"
+                p.etaSeconds < 60 -> "menos de 1 minuto"
+                else -> "~${(p.etaSeconds + 59) / 60} minutos"
+            }
+            Text(
+                "Tempo estimado: $etaLabel",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
 // Cinza-claro suave para supermercados ainda sem folheto.
 private val WaitingBg = androidx.compose.ui.graphics.Color(0xFFF1F1F1)
+
+// Azul-claro suave para o estado "a processar".
+private val ProcessingBg = androidx.compose.ui.graphics.Color(0xFFE3F2FD)

@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
+import com.folhetosmart.data.api.SupermarketStatusDto
+import com.folhetosmart.data.api.SyncStatusDto
 import com.folhetosmart.data.repository.AdminRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -150,7 +152,9 @@ class AdminViewModel(
         _uiState.update {
             it.copy(
                 phase = UploadPhase.Error(
-                    "O processamento está a demorar mais do que o esperado. Volta a verificar daqui a pouco."
+                    "⚠️ Timeout no processamento de ${marketName(slug)}. " +
+                        "O PDF pode ser muito grande ou a IA está lenta. " +
+                        "Tenta novamente ou verifica o PDF."
                 )
             )
         }
@@ -160,21 +164,90 @@ class AdminViewModel(
     fun forceSync() {
         if (_uiState.value.syncing) return
         viewModelScope.launch {
-            _uiState.update { it.copy(syncing = true, statusError = null) }
+            _uiState.update { it.copy(syncing = true, statusError = null, syncProgress = null) }
             try {
                 repository.trigger()
-                refreshStatus()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(statusError = "Não foi possível forçar a sincronização.")
+                    it.copy(syncing = false, statusError = "Não foi possível forçar a sincronização.")
                 }
-            } finally {
-                _uiState.update { it.copy(syncing = false) }
+                return@launch
             }
+            pollSyncProgress()
         }
     }
+
+    /**
+     * Acompanha o processamento multi-supermercado (GET /sync/status) com a
+     * barra de progresso detalhada. Tempo-limite de segurança de 2 minutos POR
+     * supermercado (a Claude API demora ~30-60s por PDF).
+     */
+    private suspend fun pollSyncProgress() {
+        val startMs = System.currentTimeMillis()
+        while (true) {
+            val status: SyncStatusDto? = try {
+                repository.syncStatus()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
+            if (status != null) {
+                val markets = status.supermarkets
+                _uiState.update { it.copy(syncProgress = progressFrom(markets)) }
+
+                val pending = markets.any { it.syncStatus == "running" || it.syncStatus == "pending" }
+                if (!pending) {
+                    _uiState.update { it.copy(syncing = false, syncProgress = null) }
+                    try {
+                        refreshStatus()
+                    } catch (e: Exception) {
+                        // mantém o último estado conhecido
+                    }
+                    return
+                }
+
+                val budgetMs = markets.size.coerceAtLeast(1) * PER_MARKET_TIMEOUT_MS
+                if (System.currentTimeMillis() - startMs > budgetMs) {
+                    val stuck = markets.firstOrNull {
+                        it.syncStatus == "running" || it.syncStatus == "pending"
+                    }?.name ?: "um supermercado"
+                    _uiState.update {
+                        it.copy(
+                            syncing = false,
+                            syncProgress = null,
+                            statusError = "⚠️ Timeout no processamento de $stuck. " +
+                                "O PDF pode ser muito grande ou a IA está lenta. " +
+                                "Tenta novamente ou verifica o PDF."
+                        )
+                    }
+                    return
+                }
+            }
+            delay(POLL_INTERVAL_MS)
+        }
+    }
+
+    private fun progressFrom(markets: List<SupermarketStatusDto>): SyncProgress {
+        val total = markets.size
+        val done = markets.count { it.syncStatus == "success" || it.syncStatus == "error" }
+        val remaining = (total - done).coerceAtLeast(0)
+        val lines = markets.map { m ->
+            when (m.syncStatus) {
+                "success" -> MarketLine(m.name, "${m.productsImported} produtos", done = true, failed = false)
+                "error" -> MarketLine(m.name, "Falhou", done = true, failed = true)
+                "running" -> MarketLine(m.name, "A processar com IA…", done = false, failed = false)
+                else -> MarketLine(m.name, "A aguardar…", done = false, failed = false)
+            }
+        }
+        return SyncProgress(done, total, remaining * SECONDS_PER_MARKET, lines)
+    }
+
+    /** Nome do supermercado a partir do slug (para mensagens de timeout). */
+    private fun marketName(slug: String): String =
+        _uiState.value.supermarkets.firstOrNull { it.slug == slug }?.name ?: "este supermercado"
 
     private fun humanize(e: Exception): String = when (e) {
         is HttpException -> when (e.code()) {
@@ -189,7 +262,10 @@ class AdminViewModel(
 
     companion object {
         private const val POLL_INTERVAL_MS = 2_000L
-        private const val MAX_POLLS = 90 // ~3 minutos (extração IA demora 1–2 min)
+        // Tempo-limite de 2 min por supermercado (a IA demora ~30-60s por PDF).
+        private const val PER_MARKET_TIMEOUT_MS = 2 * 60 * 1000L
+        private const val MAX_POLLS = 60 // upload de 1 supermercado: ~2 minutos
+        private const val SECONDS_PER_MARKET = 45
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
