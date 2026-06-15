@@ -1,0 +1,29 @@
+# --- IA de matching (núcleo) ---
+anthropic>=0.40.0
+sentence-transformers>=3.0.0      # fallback local quando a Claude API falha
+
+# --- Scraping ---
+scrapy>=2.11
+playwright>=1.44
+pytesseract>=0.3.10               # OCR de folhetos em PDF/imagem
+pdf2image>=1.17
+Pillow>=10.0
+opencv-python-headless>=4.9       # pré-processamento de imagem para OCR (sem GUI)
+numpy>=1.26
+
+# --- Google Drive (salvaguarda de folhetos PDF) ---
+google-api-python-client>=2.130
+google-auth-httplib2>=0.2
+google-auth-oauthlib>=1.2
+
+# --- Base de dados / worker ---
+psycopg[binary]>=3.1
+fastapi>=0.110                    # worker HTTP chamado pelo backend
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9           # multipart/form-data (upload de PDF, Fix 3)
+pydantic>=2.6
+python-dotenv>=1.0
+schedule>=1.2                     # cron simples (scheduler.py)
+
+# --- Testes ---
+pytest>=8.0

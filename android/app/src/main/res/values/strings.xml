@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">FolhetoSmart</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_compare">Comparar</string>
+    <string name="nav_list">Lista</string>
+    <string name="nav_sync">Sincronizar</string>
+    <string name="nav_alerts">Alertas</string>
+    <string name="nav_settings">Definições</string>
+
+    <!-- Notificações -->
+    <string name="fcm_channel_alerts">Alertas de preço</string>
+    <string name="fcm_channel_alerts_desc">Avisos quando um produto baixa de preço</string>
+</resources>

@@ -1,0 +1,45 @@
+# Ambiente
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Java / Maven
+backend/target/
+*.class
+.mvn/wrapper/maven-wrapper.jar
+
+# Android / Gradle
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+*.aab
+.cxx/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Segredos
+**/firebase-service-account.json
+**/*-credentials.json
+scraper/credentials/*
+!scraper/credentials/.gitkeep
+
+# Logs e dados de scraping
+scraper/data/
+scraper/tmp/
+scraper/folhetos/
+scraper/credentials/
+*.log

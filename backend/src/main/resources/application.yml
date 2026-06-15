@@ -1,0 +1,62 @@
+spring:
+  application:
+    name: folhetosmart-backend
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/folhetosmart}
+    username: ${SPRING_DATASOURCE_USERNAME:folheto}
+    password: ${SPRING_DATASOURCE_PASSWORD:folheto}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate          # o schema é gerido pelo Flyway, não pelo Hibernate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true     # tolera BD já inicializada por db/init.sql
+
+  jackson:
+    # Toda a API usa snake_case (product_ids, total_otimizado, ...) como no spec.
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
+
+  data:
+    redis:
+      # Rate limiting distribuído (ver RateLimitFilter).
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+  servlet:
+    multipart:
+      # Upload manual de folhetos em PDF (Fix 3).
+      max-file-size: 50MB
+      max-request-size: 55MB
+
+server:
+  port: 8080
+
+# --- Configuração da aplicação ---
+folheto:
+  jwt:
+    # Segredo em base64 (>= 256 bits). Em produção vem de variável de ambiente.
+    secret: ${FOLHETO_JWT_SECRET:ZmFsaGV0by1zbWFydC1kZXYtc2VjcmV0LWNoYW5nZS1tZS1wbGVhc2UtMzJi}
+    # Validade do access token em milissegundos (24h).
+    expiration-ms: 86400000
+    # Validade do refresh token em milissegundos (30 dias).
+    refresh-expiration-ms: 2592000000
+  security:
+    # Em produção: true (rejeita HTTP). Em dev local: false.
+    require-https: ${FOLHETO_REQUIRE_HTTPS:false}
+  scraper:
+    # URL do worker Python que corre o pipeline de scraping + IA.
+    url: ${FOLHETO_SCRAPER_URL:http://localhost:8090}
+
+logging:
+  level:
+    pt.folhetosmart: INFO

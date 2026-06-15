@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Obrigatórias -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Reagendar notificações locais de alertas após reinício do dispositivo -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Notificações (Android 13+) — pedida em runtime com diálogo explicativo -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- NÃO declarar: localização GPS, câmara, contactos, armazenamento.   -->
+    <!-- A Play Store penaliza permissões excessivas. A cidade do utilizador -->
+    <!-- é escolhida manualmente no onboarding — não requer permissão de    -->
+    <!-- localização do sistema.                                            -->
+
+    <application
+        android:name=".FolhetoSmartApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.FolhetoSmart"
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.FolhetoSmart">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Firebase Cloud Messaging (alertas de preço) -->
+        <service
+            android:name=".data.fcm.FolhetoMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+    </application>
+</manifest>
