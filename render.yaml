@@ -1,0 +1,64 @@
+# =====================================================================
+# Blueprint do FolhetoSmart para o plano GRATUITO do Render.
+#
+# Sobe a API de leitura (backend Spring Boot) + PostgreSQL. O processamento
+# semanal pesado (scraping Playwright + OCR/visão) NÃO corre aqui: corre no
+# GitHub Actions (.github/workflows/weekly-sync.yml), porque o worker não cabe
+# nos 512 MB de RAM do plano grátis. Mantém-se o modelo "processar 1×/semana
+# no servidor (CI), ler N× pelos utilizadores".
+#
+# Limitações do plano grátis (ver deploy/render/README.md):
+#   - o web service adormece após 15 min sem tráfego (1.º pedido é lento);
+#   - a base de dados grátis é apagada ~30 dias após criação.
+# =====================================================================
+
+databases:
+  - name: folhetosmart-db
+    databaseName: folhetosmart
+    user: folheto
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: folhetosmart-backend
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /actuator/health
+    autoDeploy: true
+    envVars:
+      # --- Base de dados (Render injeta cada propriedade da BD acima) ---
+      - key: DB_HOST
+        fromDatabase: { name: folhetosmart-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: folhetosmart-db, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: folhetosmart-db, property: database }
+      - key: DB_USER
+        fromDatabase: { name: folhetosmart-db, property: user }
+      - key: DB_PASSWORD
+        fromDatabase: { name: folhetosmart-db, property: password }
+
+      # --- Segurança ---
+      - key: FOLHETO_REQUIRE_HTTPS
+        value: "true"                  # o Render termina TLS no edge
+      - key: FOLHETO_JWT_SECRET
+        sync: false                    # gera com: openssl rand -base64 48
+
+      # --- Conta de administrador (criada no arranque por AdminBootstrap) ---
+      - key: FOLHETO_ADMIN_EMAIL
+        sync: false
+      - key: FOLHETO_ADMIN_PASSWORD
+        sync: false
+
+      # --- Scheduler interno OFF: quem processa é o GitHub Actions ---
+      - key: FOLHETO_SCHEDULER_ENABLED
+        value: "false"
+
+      # --- JVM dentro dos 512 MB do plano grátis ---
+      - key: JAVA_TOOL_OPTIONS
+        value: "-XX:MaxRAMPercentage=75.0"

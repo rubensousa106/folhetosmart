@@ -56,6 +56,7 @@ fun FlyerStatusChip(
     syncedAtLabel: String?,
     modifier: Modifier = Modifier,
     syncSource: String? = null,
+    progressMessage: String? = null,
     onUploadPdf: (() -> Unit)? = null
 ) {
     val pulse = rememberInfiniteTransition(label = "flyer-pulse")
@@ -100,6 +101,7 @@ fun FlyerStatusChip(
                 productsImported = productsImported,
                 syncedAtLabel = syncedAtLabel,
                 syncSource = syncSource,
+                progressMessage = progressMessage,
                 pulseAlpha = pulseAlpha
             )
 
@@ -156,12 +158,15 @@ private fun TrailingContent(
     productsImported: Int,
     syncedAtLabel: String?,
     syncSource: String?,
+    progressMessage: String?,
     pulseAlpha: Float
 ) {
     when (syncStatus) {
         "running" -> Text(
-            // Fonte Drive -> "📁 PDF disponível no Google Drive · A processar…"
-            if (syncSource == "drive") "📁 Google Drive · A processar…" else "A processar…",
+            // progress_message do backend (ex.: "página 2/4") quando existe;
+            // senão, fonte Drive -> "📁 Google Drive · A processar…".
+            progressMessage
+                ?: if (syncSource == "drive") "📁 Google Drive · A processar…" else "A processar…",
             style = MaterialTheme.typography.labelMedium,
             color = FolhetoSmartGreen,
             fontWeight = FontWeight.SemiBold

@@ -11,7 +11,10 @@ data class SyncStatusDto(
     val allReady: Boolean = false,
     val readyCount: Int = 0,
     val totalCount: Int = 0,
-    val lastSync: LastSyncDto? = null
+    val lastSync: LastSyncDto? = null,
+    // Honestidade da UI (Fix 3): só há "Ver promoções" se houver dados reais.
+    val hasCurrentWeekData: Boolean = false,
+    val totalProductsThisWeek: Int = 0
 )
 
 data class SupermarketStatusDto(
@@ -24,7 +27,8 @@ data class SupermarketStatusDto(
     val productsImported: Int = 0,
     val syncedAt: String? = null,
     val errorMessage: String? = null,
-    val syncSource: String? = null      // site | drive | upload
+    val syncSource: String? = null,     // site | drive | upload
+    val progressMessage: String? = null // ex.: "página 2/4" durante running
 )
 
 data class LastSyncDto(
@@ -181,4 +185,26 @@ data class AlertDto(
     val anyPromotion: Boolean = false,
     val active: Boolean = true,
     val createdAt: String? = null
+)
+
+// --- Administração (painel só-ADMIN) ---------------------------------------
+data class AdminUploadResponseDto(
+    val syncRunId: String,
+    val filename: String,
+    val driveFileId: String? = null,
+    val status: String                  // "processing"
+)
+
+data class AdminFlyersStatusDto(
+    val week: String,                   // "DD-MM-YYYY - DD-MM-YYYY"
+    val supermarkets: List<AdminFlyerStatusDto> = emptyList()
+)
+
+data class AdminFlyerStatusDto(
+    val name: String,
+    val slug: String,
+    val hasFlyer: Boolean = false,
+    val driveFilename: String? = null,
+    val productsImported: Int = 0,
+    val syncedAt: String? = null
 )

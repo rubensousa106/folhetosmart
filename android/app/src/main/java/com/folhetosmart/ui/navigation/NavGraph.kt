@@ -3,6 +3,7 @@ package com.folhetosmart.ui.navigation
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -15,6 +16,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -24,6 +26,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.folhetosmart.R
+import com.folhetosmart.features.admin.AdminScreen
 import com.folhetosmart.features.alerts.AlertsScreen
 import com.folhetosmart.features.compare.CompareScreen
 import com.folhetosmart.features.legal.PrivacyPolicyScreen
@@ -47,22 +50,30 @@ sealed class Destination(
     data object Sync : Destination("sync", R.string.nav_sync, Icons.Filled.Sync)
     data object Alerts : Destination("alerts", R.string.nav_alerts, Icons.Filled.Notifications)
     data object Settings : Destination("settings", R.string.nav_settings, Icons.Filled.Settings)
+    data object Admin : Destination("admin", R.string.nav_admin, Icons.Filled.AdminPanelSettings)
 
     companion object {
+        // Separadores base (todos os utilizadores). O "Admin" é acrescentado à
+        // parte para quem tiver role ADMIN — ver FolhetoSmartRoot (Fix 2).
         val all = listOf(Compare, ShoppingList, Sync, Alerts, Settings)
     }
 }
 
 @Composable
-fun FolhetoSmartRoot(onLogout: () -> Unit = {}) {
+fun FolhetoSmartRoot(isAdmin: Boolean = false, onLogout: () -> Unit = {}) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
+    // ADMIN (Fix 2): separador extra "Admin"; restantes veem os separadores base.
+    val destinations = remember(isAdmin) {
+        if (isAdmin) Destination.all + Destination.Admin else Destination.all
+    }
+
     Scaffold(
         bottomBar = {
             NavigationBar {
-                Destination.all.forEach { dest ->
+                destinations.forEach { dest ->
                     NavigationBarItem(
                         selected = currentRoute == dest.route,
                         onClick = {
@@ -107,6 +118,11 @@ fun FolhetoSmartRoot(onLogout: () -> Unit = {}) {
                     onOpenTerms = { navController.navigate(ROUTE_TERMS_OF_SERVICE) },
                     onLogout = onLogout
                 )
+            }
+
+            // Painel de administração — só registado para quem é ADMIN (Fix 2/3).
+            if (isAdmin) {
+                composable(Destination.Admin.route) { AdminScreen() }
             }
 
             // Documentos legais (ecrãs internos, texto local)

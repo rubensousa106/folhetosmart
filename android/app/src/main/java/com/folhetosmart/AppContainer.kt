@@ -6,6 +6,7 @@ import com.folhetosmart.data.api.ApiClient
 import com.folhetosmart.data.local.AppPrefs
 import com.folhetosmart.data.local.FolhetoDatabase
 import com.folhetosmart.data.local.TokenStore
+import com.folhetosmart.data.repository.AdminRepository
 import com.folhetosmart.data.repository.AlertsRepository
 import com.folhetosmart.data.repository.CompareRepository
 import com.folhetosmart.data.repository.PrivacyRepository
@@ -30,6 +31,7 @@ class AppContainer(context: Context) {
     ).build()
 
     val syncRepository = SyncRepository(api, database.cacheDao())
+    val adminRepository = AdminRepository(api)
     val compareRepository = CompareRepository(api, database.cacheDao())
     val shoppingRepository = ShoppingRepository(api, database.shoppingDao(), database.cacheDao())
     val alertsRepository = AlertsRepository(api, tokenStore)

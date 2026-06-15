@@ -28,6 +28,8 @@ class MainActivity : ComponentActivity() {
 
                 if (authenticated) {
                     FolhetoSmartRoot(
+                        // O separador Admin só aparece para role ADMIN (Fix 2).
+                        isAdmin = container.tokenStore.isAdmin,
                         onLogout = {
                             container.alertsRepository.logout() // limpa o token
                             authenticated = false               // volta ao Login

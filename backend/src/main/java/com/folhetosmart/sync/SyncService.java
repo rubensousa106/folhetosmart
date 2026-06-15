@@ -56,7 +56,8 @@ public class SyncService {
                         s.getName(), s.getSlug(),
                         s.isFlyerAvailable(), s.getFlyerAvailableSince(),
                         s.getSyncStatus(), s.getProductsImported(),
-                        s.getSyncedAt(), s.getErrorMessage(), s.getSyncSource()))
+                        s.getSyncedAt(), s.getErrorMessage(), s.getSyncSource(),
+                        null))   // progressMessage: sem fonte por agora (reservado)
                 .toList();
 
         LastSync lastSync = syncRunRepository
@@ -64,8 +65,13 @@ public class SyncService {
                 .map(this::buildLastSync)
                 .orElse(null);
 
+        // Há dados reais desta semana? (controla "Ver promoções da semana" na app)
+        LocalDate today = LocalDate.now(clock);
+        int totalThisWeek = (int) priceRepository.countDistinctProductsWithCurrentPrice(today);
+
         return new SyncStatusResponse(
-                statuses, total > 0 && ready == total, ready, total, lastSync);
+                statuses, total > 0 && ready == total, ready, total, lastSync,
+                totalThisWeek > 0, totalThisWeek);
     }
 
     private LastSync buildLastSync(SyncRun run) {

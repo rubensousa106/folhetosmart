@@ -1,6 +1,7 @@
 package com.folhetosmart.data.api
 
 import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -108,4 +109,21 @@ interface ApiService {
         @Header("Authorization") bearer: String,
         @Path("id") alertId: String
     )
+
+    // --- Administração (só ADMIN; 403 para outros papéis) ---
+    /** Upload de um folheto PDF -> Google Drive + extração com IA. */
+    @Multipart
+    @POST("api/v1/admin/upload-flyer")
+    suspend fun adminUploadFlyer(
+        @Part("supermarket_slug") supermarketSlug: RequestBody,
+        @Part("valid_from") validFrom: RequestBody,
+        @Part("valid_until") validUntil: RequestBody,
+        @Part file: MultipartBody.Part
+    ): AdminUploadResponseDto
+
+    @GET("api/v1/admin/flyers/status")
+    suspend fun adminFlyersStatus(): AdminFlyersStatusDto
+
+    @POST("api/v1/admin/sync/trigger")
+    suspend fun adminTrigger(): SyncTriggerDto
 }

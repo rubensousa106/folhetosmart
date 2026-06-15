@@ -7,15 +7,27 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
+import com.folhetosmart.data.api.SupermarketStatusDto
 import com.folhetosmart.data.api.SyncStatusDto
 import com.folhetosmart.data.repository.SyncRepository
 import com.folhetosmart.data.repository.WeekRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
+/**
+ * Ecrã Sincronizar (Fix 3). É **só leitura**: lê `GET /api/v1/sync/status` e
+ * reflete honestamente o estado do servidor. Nunca afirma "dados atualizados"
+ * sem que o processamento tenha mesmo terminado com sucesso, nem oferece "Ver
+ * promoções" sem dados reais desta semana na BD. Quando há supermercados a
+ * processar, faz polling a cada 2s (com tempo-limite de 10 min).
+ */
 class SyncViewModel(
     private val repository: SyncRepository,
     private val weekRepository: WeekRepository
@@ -24,17 +36,26 @@ class SyncViewModel(
     private val _uiState = MutableStateFlow<SyncUiState>(SyncUiState.Loading)
     val uiState: StateFlow<SyncUiState> = _uiState.asStateFlow()
 
+    private var lastCheckedLabel: String? = null
+    private var pollingJob: Job? = null
+
     init {
         refresh()
     }
 
-    /** Recarrega o estado dos folhetos. */
+    /**
+     * Lê o estado atual (SÓ LEITURA — não dispara processamento). Usado na carga
+     * inicial e pelo botão "Atualizar estado". Atualiza "Última verificação" e,
+     * se algum supermercado estiver a processar, arranca o polling.
+     */
     fun refresh() {
         viewModelScope.launch {
-            _uiState.value = SyncUiState.Loading
             try {
                 val (status, fromCache) = repository.status()
-                _uiState.value = toIdleState(status, fromCache)
+                lastCheckedLabel = nowHHmm()
+                applyStatus(status, fromCache)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.value = SyncUiState.Error(
                     "Não foi possível verificar os folhetos. Verifica a ligação à internet."
@@ -43,131 +64,162 @@ class SyncViewModel(
         }
     }
 
-    /**
-     * Sincronização do utilizador = só LEITURA (Fix 3). Não dispara
-     * processamento nem chama a Claude API (isso corre 1×/semana no servidor).
-     * Lê o estado dos folhetos e descarrega os produtos da semana para a cache.
-     */
-    fun startSync() {
-        val supermarkets = when (val s = _uiState.value) {
-            is SyncUiState.WaitingForFlyers -> s.supermarkets
-            is SyncUiState.ReadyToSync -> s.supermarkets
-            is SyncUiState.Done -> s.supermarkets
-            else -> emptyList()
+    private fun applyStatus(status: SyncStatusDto, fromCache: Boolean) {
+        if (status.totalCount == 0) {
+            _uiState.value = SyncUiState.Error("Sem supermercados configurados no servidor.")
+            return
         }
-        viewModelScope.launch {
-            _uiState.value = SyncUiState.Syncing(SyncProgress(0), supermarkets)
-            try {
-                val status = repository.status().data
-                val products = weekRepository.syncWeekProducts(force = true)
-                _uiState.value = SyncUiState.Done(
-                    SyncResult(
-                        productsMatched = products.size,
-                        promotionsFound = status.lastSync?.promotionsFound ?: 0,
-                        avgSavingsPct = status.lastSync?.avgSavingsPct,
-                        finishedAt = status.lastSync?.finishedAt
-                    ),
-                    status.supermarkets
-                )
-            } catch (e: Exception) {
-                _uiState.value = SyncUiState.Error(
-                    "Não foi possível atualizar os dados. Verifica a ligação."
-                )
-            }
+        if (status.supermarkets.any { it.syncStatus == "running" }) {
+            _uiState.value = processingFrom(status.supermarkets)
+            startPolling()
+        } else {
+            stopPolling()
+            _uiState.value = toIdle(status, fromCache)
         }
     }
 
-    /** Upload manual de um folheto em PDF (Fix 3) — entra em "A processar…". */
+    /**
+     * Upload manual de um folheto em PDF (botão 📎 nos supermercados em erro).
+     * Após o envio entra em "A processar…" e segue o progresso por polling.
+     */
     fun uploadPdf(slug: String, pdfBytes: ByteArray) {
-        val supermarkets = when (val s = _uiState.value) {
-            is SyncUiState.WaitingForFlyers -> s.supermarkets
-            is SyncUiState.ReadyToSync -> s.supermarkets
-            is SyncUiState.Done -> s.supermarkets
-            else -> emptyList()
-        }
         viewModelScope.launch {
-            _uiState.value = SyncUiState.Syncing(SyncProgress(0), supermarkets)
             try {
-                val upload = repository.uploadPdf(slug, pdfBytes)
-                pollRun(upload.syncRunId, supermarkets)
+                repository.uploadPdf(slug, pdfBytes)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.value = SyncUiState.Error(
                     "Não foi possível enviar o PDF. Confirma que é um PDF válido."
                 )
+                return@launch
             }
+            // Otimista: marca o supermercado como "running" e arranca o polling
+            // com um período de tolerância para o worker arrancar.
+            val markets = currentSupermarkets().map {
+                if (it.slug == slug) it.copy(syncStatus = "running", errorMessage = null) else it
+            }
+            _uiState.value = processingFrom(markets)
+            startPolling(graceMs = UPLOAD_GRACE_MS)
         }
     }
 
-    private suspend fun pollRun(
-        runId: String,
-        supermarkets: List<com.folhetosmart.data.api.SupermarketStatusDto>
-    ) {
-        repeat(MAX_POLLS) {
-            delay(POLL_INTERVAL_MS)
-            val run = try {
-                repository.run(runId)
-            } catch (e: Exception) {
-                null // falha pontual de rede: continua a tentar
-            }
-            when (run?.status) {
-                // "done" e "error" (do run) terminam a sincronização. Em ambos
-                // re-buscamos o status fresco para refletir o estado individual
-                // de cada supermercado (success/error com botão de upload) e o
-                // resumo. O run pode ser "error" mesmo com supermercados a
-                // sincronizar com sucesso — daí mostrarmos sempre a lista.
-                "done", "error" -> {
-                    val fresh = try {
-                        repository.status().data
-                    } catch (e: Exception) {
-                        null
-                    }
-                    val summary = fresh?.lastSync
-                    _uiState.value = SyncUiState.Done(
-                        SyncResult(
-                            productsMatched = summary?.productsMatched ?: run.productsMatched,
-                            promotionsFound = summary?.promotionsFound ?: 0,
-                            avgSavingsPct = summary?.avgSavingsPct,
-                            finishedAt = summary?.finishedAt ?: run.finishedAt
-                        ),
-                        fresh?.supermarkets ?: supermarkets
-                    )
-                    return
+    private fun startPolling(graceMs: Long = 0L) {
+        if (pollingJob?.isActive == true) return
+        pollingJob = viewModelScope.launch {
+            val startMs = System.currentTimeMillis()
+            var sawRunning = graceMs == 0L
+            while (true) {
+                delay(POLL_INTERVAL_MS)
+                val elapsed = System.currentTimeMillis() - startMs
+                val status = try {
+                    repository.status().data
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    null // falha pontual de rede: continua a tentar
                 }
-
-                else -> _uiState.value = SyncUiState.Syncing(
-                    SyncProgress(run?.productsMatched ?: 0),
-                    supermarkets
-                )
+                if (status != null) {
+                    lastCheckedLabel = nowHHmm()
+                    val running = status.supermarkets.any { it.syncStatus == "running" }
+                    if (running) sawRunning = true
+                    // Termina quando já não há nada a processar (e, no caso do
+                    // upload, depois de termos visto o running ou de esgotar a
+                    // tolerância) — evita "concluir" antes do worker arrancar.
+                    if (!running && (sawRunning || elapsed >= graceMs)) {
+                        finishProcessing(status)
+                        return@launch
+                    }
+                    _uiState.value = processingFrom(status.supermarkets)
+                }
+                if (elapsed > TIMEOUT_MS) {
+                    _uiState.value = SyncUiState.Error(
+                        "⚠️ A sincronização está a demorar mais que o esperado. " +
+                            "Verifica a tua ligação e tenta novamente."
+                    )
+                    return@launch
+                }
             }
         }
-        _uiState.value = SyncUiState.Error(
-            "A sincronização está a demorar mais do que o esperado. Volta a verificar daqui a pouco."
-        )
     }
 
-    private fun toIdleState(status: SyncStatusDto, fromCache: Boolean): SyncUiState {
-        if (status.totalCount == 0) {
-            return SyncUiState.Error("Sem supermercados configurados no servidor.")
+    private fun stopPolling() {
+        pollingJob?.cancel()
+        pollingJob = null
+    }
+
+    private fun finishProcessing(status: SyncStatusDto) {
+        val anySuccess = status.supermarkets.any { it.syncStatus == "success" }
+        _uiState.value = if (anySuccess && status.hasCurrentWeekData) {
+            SyncUiState.Completed(
+                productsMatched = status.totalProductsThisWeek.takeIf { it > 0 }
+                    ?: status.lastSync?.productsMatched ?: 0,
+                avgSavingsPct = status.lastSync?.avgSavingsPct,
+                supermarkets = status.supermarkets
+            )
+        } else {
+            SyncUiState.AllFailed(status.supermarkets)
         }
+    }
+
+    /**
+     * Pré-carrega os produtos da semana para a cache local (offline no
+     * Comparar). NÃO dispara processamento nem chama a Claude API — best-effort.
+     */
+    fun prefetchWeek() {
+        viewModelScope.launch {
+            try {
+                weekRepository.syncWeekProducts(force = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // best-effort: o Comparar recarrega na mesma
+            }
+        }
+    }
+
+    override fun onCleared() {
+        stopPolling()
+        super.onCleared()
+    }
+
+    private fun processingFrom(markets: List<SupermarketStatusDto>): SyncUiState.Processing {
+        val total = markets.size
+        val done = markets.count { it.syncStatus == "success" || it.syncStatus == "error" }
+        val remaining = (total - done).coerceAtLeast(0)
+        return SyncUiState.Processing(markets, done, total, remaining * SECONDS_PER_MARKET)
+    }
+
+    private fun toIdle(status: SyncStatusDto, fromCache: Boolean): SyncUiState.Idle {
         val lastSync = status.lastSync?.let {
             LastSyncSummary(it.finishedAt, it.productsMatched, it.promotionsFound, it.avgSavingsPct)
         }
-        return if (status.allReady) {
-            SyncUiState.ReadyToSync(status.supermarkets, lastSync)
-        } else {
-            SyncUiState.WaitingForFlyers(
-                ready = status.readyCount,
-                total = status.totalCount,
-                supermarkets = status.supermarkets,
-                lastSync = lastSync,
-                offline = fromCache
-            )
-        }
+        return SyncUiState.Idle(
+            supermarkets = status.supermarkets,
+            hasCurrentWeekData = status.hasCurrentWeekData,
+            totalProductsThisWeek = status.totalProductsThisWeek,
+            lastSync = lastSync,
+            lastCheckedLabel = lastCheckedLabel,
+            offline = fromCache
+        )
     }
+
+    private fun currentSupermarkets(): List<SupermarketStatusDto> = when (val s = _uiState.value) {
+        is SyncUiState.Idle -> s.supermarkets
+        is SyncUiState.Processing -> s.supermarkets
+        is SyncUiState.Completed -> s.supermarkets
+        is SyncUiState.AllFailed -> s.supermarkets
+        else -> emptyList()
+    }
+
+    private fun nowHHmm(): String = LocalTime.now().format(HHMM)
 
     companion object {
         private const val POLL_INTERVAL_MS = 2_000L
-        private const val MAX_POLLS = 150        // ~5 minutos
+        private const val TIMEOUT_MS = 10 * 60 * 1000L      // 10 minutos
+        private const val UPLOAD_GRACE_MS = 20_000L         // espera o worker arrancar
+        private const val SECONDS_PER_MARKET = 30
+        private val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {

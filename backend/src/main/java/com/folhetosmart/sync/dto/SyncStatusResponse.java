@@ -9,7 +9,11 @@ public record SyncStatusResponse(
         boolean allReady,
         int readyCount,
         int totalCount,
-        LastSync lastSync
+        LastSync lastSync,
+        // Honestidade da UI (Fix 3): a app só mostra "Ver promoções da semana"
+        // quando existem mesmo produtos válidos esta semana na BD.
+        boolean hasCurrentWeekData,
+        int totalProductsThisWeek
 ) {
     public record SupermarketStatus(
             String name,
@@ -20,7 +24,8 @@ public record SyncStatusResponse(
             int productsImported,
             Instant syncedAt,
             String errorMessage,
-            String syncSource           // site | drive | upload | null
+            String syncSource,          // site | drive | upload | null
+            String progressMessage      // ex.: "página 2/4" durante running; pode ser null
     ) {
     }
 
