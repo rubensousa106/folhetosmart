@@ -32,9 +32,9 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-folhetosmart}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-folheto}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-folheto}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://dpg-d8o0vl8k1i2s73dpean0-a:5432/folhetosmart
+      SPRING_DATASOURCE_USERNAME: folhetosmart_user
+      SPRING_DATASOURCE_PASSWORD: lwWwXxuxTX86oukR4qGgLlrEcq3g6v2S
       FOLHETO_JWT_SECRET: ${FOLHETO_JWT_SECRET}
       FOLHETO_SCRAPER_URL: http://scraper:8090
       # Conta de administrador criada no arranque (endpoints só-ADMIN).
