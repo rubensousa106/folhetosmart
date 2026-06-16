@@ -1,11 +1,10 @@
 package com.folhetosmart.sync;
 
-import com.folhetosmart.sync.dto.AdminFlyersStatusResponse;
-import com.folhetosmart.sync.dto.AdminProcessFlyerRequest;
-import com.folhetosmart.sync.dto.AdminProcessFlyerResponse;
-import com.folhetosmart.sync.dto.AdminUploadResponse;
-import com.folhetosmart.sync.dto.AdminUploadToDriveResponse;
-import com.folhetosmart.sync.dto.SyncTriggerResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,6 +16,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
+import com.folhetosmart.sync.dto.AdminFlyersStatusResponse;
+import com.folhetosmart.sync.dto.AdminProcessFlyerRequest;
+import com.folhetosmart.sync.dto.AdminProcessFlyerResponse;
+import com.folhetosmart.sync.dto.AdminUploadResponse;
+import com.folhetosmart.sync.dto.AdminUploadToDriveResponse;
+import com.folhetosmart.sync.dto.SyncTriggerResponse;
 
 /**
  * Painel de administração. Todos os endpoints exigem role ADMIN — qualquer
@@ -33,7 +39,6 @@ public class AdminController {
 
     private final AdminService adminService;
     private final SyncService syncService;
-
 
     public AdminController(AdminService adminService, SyncService syncService) {
         this.adminService = adminService;
@@ -56,11 +61,10 @@ public class AdminController {
     }
 
     /**
-     * POST /api/v1/admin/upload-to-drive — passo 1 do pipeline novo: guarda o
-     * PDF no Google Drive (em memória) e devolve { drive_file_id, filename }.
+     * POST /api/v1/admin/upload-to-drive — upload de um PDF para o Drive
      */
-    @PostMapping("/upload-flyer")
-    public ResponseEntity<?> uploadFlyer(
+    @PostMapping("/upload-to-drive")
+    public ResponseEntity<?> uploadToDrive(
             @RequestParam("file") MultipartFile file,
             @RequestParam("supermarket") String supermarket,
             @RequestParam("userEmail") String userEmail) {
@@ -94,12 +98,10 @@ public class AdminController {
             ));
         }
     }
-}
 
     /**
      * POST /api/v1/admin/process-flyer — passo 2 (SÍNCRONO, ~1-2 min):
-     * descarrega o PDF do Drive, extrai com a Claude API e persiste. Devolve
-     * { products_imported, status }.
+     * descarrega o PDF do Drive, extrai com a Claude API e persiste.
      */
     @PostMapping("/process-flyer")
     public ResponseEntity<AdminProcessFlyerResponse> processFlyer(
