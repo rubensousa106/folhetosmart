@@ -72,6 +72,32 @@ services:
     ports:
       - "8090:8090"
 
+  # Vigia a pasta do Google Drive e processa PDFs novos automaticamente
+  # (espera 2 min após o upload). Corre o pipeline IN-PROCESS — não chama o
+  # worker HTTP — por isso precisa das mesmas credenciais que o scraper.
+  drive-scheduler:
+    build:
+      context: ./scraper
+      dockerfile: Dockerfile
+    container_name: folhetosmart-drive-scheduler
+    command: python scheduler_drive.py
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-folheto}:${POSTGRES_PASSWORD:-folheto}@postgres:5432/${POSTGRES_DB:-folhetosmart}
+      GOOGLE_DRIVE_FOLDER_ID: ${GOOGLE_DRIVE_FOLDER_ID:-}
+      GOOGLE_DRIVE_CREDENTIALS_PATH: ${GOOGLE_DRIVE_CREDENTIALS_PATH:-}
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+      FCM_CREDENTIALS_PATH: ${FCM_CREDENTIALS_PATH:-}
+      # Rede com inspeção TLS (apenas dev — nunca em produção).
+      FOLHETO_INSECURE_TLS: ${FOLHETO_INSECURE_TLS:-0}
+    volumes:
+      - ./scraper/credentials:/app/credentials:ro
+    restart: unless-stopped
+
   nginx:
     image: nginx:alpine
     container_name: folhetosmart-nginx

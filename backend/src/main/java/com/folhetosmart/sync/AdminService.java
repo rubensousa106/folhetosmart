@@ -4,7 +4,9 @@ import com.folhetosmart.common.ApiException;
 import com.folhetosmart.common.NotFoundException;
 import com.folhetosmart.sync.dto.AdminFlyersStatusResponse;
 import com.folhetosmart.sync.dto.AdminFlyersStatusResponse.FlyerStatus;
+import com.folhetosmart.sync.dto.AdminProcessFlyerResponse;
 import com.folhetosmart.sync.dto.AdminUploadResponse;
+import com.folhetosmart.sync.dto.AdminUploadToDriveResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,6 +81,52 @@ public class AdminService {
             throw ex;
         }
         return new AdminUploadResponse(run.getId(), filename, driveFileId, "processing");
+    }
+
+    /**
+     * Pipeline novo, passo 1: guarda o PDF no Google Drive (em memória, sem
+     * disco) com o nome "{Supermercado} {DD-MM-YYYY} - {DD-MM-YYYY}.pdf" e
+     * devolve o id do ficheiro. NÃO processa nada ainda.
+     */
+    public AdminUploadToDriveResponse uploadToDrive(String slug, String validFrom,
+                                                    String validUntil, MultipartFile file) {
+        Supermarket market = supermarketRepository.findBySlug(slug)
+                .orElseThrow(() -> new NotFoundException("Supermercado não encontrado: " + slug));
+        validateDate(validFrom);
+        validateDate(validUntil);
+
+        byte[] bytes = SyncService.readBytes(file);
+        SyncService.validatePdf(file, bytes);
+
+        String filename = market.getName() + " " + validFrom + " - " + validUntil + ".pdf";
+        String driveFileId = scraperClient.uploadToDrive(bytes, filename);
+        if (driveFileId == null || driveFileId.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY,
+                    "Não foi possível guardar o folheto no Google Drive.");
+        }
+        return new AdminUploadToDriveResponse(driveFileId, filename);
+    }
+
+    /**
+     * Pipeline novo, passo 2: o worker descarrega o PDF do Drive (memória),
+     * corre a Claude API e persiste. SÍNCRONO — bloqueia ~1-2 min. NÃO é
+     * {@code @Transactional} e NÃO cria sync_run de propósito: o worker (chamada
+     * síncrona) é o dono do estado do supermercado, e uma transação aqui
+     * fecharia por cima do resultado dele.
+     */
+    public AdminProcessFlyerResponse processFlyer(String slug, String validFrom,
+                                                  String validUntil, String driveFileId) {
+        supermarketRepository.findBySlug(slug)
+                .orElseThrow(() -> new NotFoundException("Supermercado não encontrado: " + slug));
+        validateDate(validFrom);
+        validateDate(validUntil);
+        if (driveFileId == null || driveFileId.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "drive_file_id em falta.");
+        }
+
+        ScraperClient.ProcessFlyerResult result =
+                scraperClient.processFlyer(driveFileId, slug, validFrom, validUntil, null);
+        return new AdminProcessFlyerResponse(result.productsImported(), result.status());
     }
 
     /** Estado dos folhetos da semana atual (segunda a domingo). */

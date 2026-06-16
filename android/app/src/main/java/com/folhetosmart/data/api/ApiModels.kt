@@ -208,3 +208,21 @@ data class AdminFlyerStatusDto(
     val productsImported: Int = 0,
     val syncedAt: String? = null
 )
+
+// Pipeline novo (2 passos): Drive (memória) -> Claude (PDF nativo).
+data class AdminUploadToDriveDto(
+    val driveFileId: String? = null,
+    val filename: String? = null
+)
+
+data class ProcessFlyerRequest(
+    val driveFileId: String,
+    val supermarketSlug: String,
+    val validFrom: String,
+    val validUntil: String
+)
+
+data class ProcessFlyerResponseDto(
+    val productsImported: Int = 0,
+    val status: String = "error"        // "success" | "error"
+)

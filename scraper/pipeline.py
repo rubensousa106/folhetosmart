@@ -350,3 +350,122 @@ def run_pdf_sync(
         summary.products_unmatched,
     )
     return summary
+
+
+def run_drive_flyer_sync(
+    drive_file_id: str,
+    supermarket_slug: str,
+    valid_from: str,
+    valid_until: str,
+    *,
+    sync_run_id: Optional[str] = None,
+) -> SyncSummary:
+    """Pipeline do ADMIN: Drive (em memória) -> Claude (PDF nativo) -> matcher -> BD.
+
+    O PDF é descarregado do Drive para memória e analisado com a API de
+    documentos do Claude (`claude_extractor`) — nunca toca no disco. `valid_from`
+    e `valid_until` vêm em DD-MM-YYYY (já validados no backend). No fim avisa
+    todos os utilizadores por FCM.
+    """
+    from ai_matcher.claude_extractor import process_flyer_from_drive
+
+    window = _window_from(valid_from, valid_until)
+    summary = SyncSummary()
+    name = _supermarket_name(supermarket_slug)
+    _mark_sync(supermarket_slug, "running", source="drive")
+
+    try:
+        items = process_flyer_from_drive(drive_file_id, name, valid_from, valid_until)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Falha na extração do folheto (Drive %s)", drive_file_id)
+        summary.errors.append(f"extração: {exc}")
+        _mark_sync(supermarket_slug, "error", error_message=f"Extração falhou: {exc}"[:500])
+        if sync_run_id:
+            with db.connect() as conn:
+                db.update_sync_run(
+                    conn, sync_run_id, status="error",
+                    error_message=f"Extração falhou: {exc}"[:500], finished=True,
+                )
+        return summary
+
+    raw_products = _to_raw_products(items, supermarket_slug, window, drive_file_id)
+    summary.per_supermarket[supermarket_slug] = len(raw_products)
+    _match_and_persist(raw_products, summary, sync_run_id=sync_run_id, window=window)
+
+    if raw_products and not summary.errors:
+        try:
+            with db.connect() as conn:
+                db.set_flyer_available(conn, supermarket_slug, True)
+        except Exception:  # noqa: BLE001
+            logger.exception("Falha ao marcar flyer_available=true (%s)", supermarket_slug)
+        _mark_sync(supermarket_slug, "success",
+                   products_imported=len(raw_products), source="drive")
+        _notify_new_flyers(summary)
+    elif summary.errors:
+        _mark_sync(supermarket_slug, "error", error_message="; ".join(summary.errors[:3]))
+    else:
+        _mark_sync(supermarket_slug, "error", error_message="Nenhum produto extraído do PDF")
+
+    logger.info(
+        "Folheto do Drive de %s: %d produtos, %d matched",
+        supermarket_slug, len(raw_products), summary.products_matched,
+    )
+    return summary
+
+
+def _window_from(valid_from: str, valid_until: str) -> FlyerWindow:
+    """Constrói a janela a partir de datas DD-MM-YYYY do ADMIN."""
+    import datetime as dt
+
+    f = dt.datetime.strptime(valid_from, "%d-%m-%Y").date()
+    u = dt.datetime.strptime(valid_until, "%d-%m-%Y").date()
+    return FlyerWindow(valid_from=f, valid_until=u)
+
+
+def _to_raw_products(
+    items: list[dict], slug: str, window: FlyerWindow, drive_file_id: str
+) -> list[RawProduct]:
+    """Converte os dicts do `claude_extractor` em `RawProduct` para o matcher."""
+    out: list[RawProduct] = []
+    for it in items:
+        raw_name = str(it.get("raw_name") or "").strip()
+        if not raw_name:
+            continue
+        try:
+            price = float(it.get("price"))
+        except (TypeError, ValueError):
+            continue  # sem preço utilizável — ignora
+        original = it.get("original_price")
+        try:
+            original = float(original) if original is not None else None
+        except (TypeError, ValueError):
+            original = None
+        out.append(RawProduct(
+            raw_name=raw_name,
+            price=price,
+            supermarket=slug,
+            original_price=original,
+            is_promotion=bool(it.get("is_promotion", False)),
+            promotion_label=it.get("promotion_label"),
+            source_url=f"drive:{drive_file_id}",
+            valid_from=window.valid_from,
+            valid_until=window.valid_until,
+        ))
+    return out
+
+
+def _notify_new_flyers(summary: SyncSummary) -> None:
+    """Avisa TODOS os utilizadores de que há folhetos novos (best effort)."""
+    try:
+        from notifications import notify_new_flyers
+
+        if summary.products_matched > 0:
+            with db.connect() as conn:
+                savings = db.week_avg_savings_pct(conn)
+            notify_new_flyers(
+                products=summary.products_matched,
+                markets=len(summary.per_supermarket),
+                savings_pct=savings,
+            )
+    except Exception:  # noqa: BLE001
+        logger.exception("Falha nas notificações FCM")

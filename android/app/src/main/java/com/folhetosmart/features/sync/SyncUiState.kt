@@ -29,3 +29,9 @@ sealed interface SyncUiState {
     /** Falha na primeira leitura sem nada em cache para mostrar. */
     data class Error(val message: String) : SyncUiState
 }
+
+/** Eventos one-shot do ecrã Sincronizar (mostrados uma vez, ex.: Snackbar). */
+sealed interface SyncEvent {
+    /** Uma verificação MANUAL terminou; [hasData] = há dados esta semana. */
+    data class Checked(val hasData: Boolean) : SyncEvent
+}

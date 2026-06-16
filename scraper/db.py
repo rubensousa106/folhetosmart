@@ -260,3 +260,27 @@ def update_sync_run(
     conn.execute(
         f"UPDATE sync_runs SET {', '.join(sets)} WHERE id = %s", params
     )
+
+
+# --- Processamento automático de PDFs do Drive (scheduler_drive.py) ----------
+def get_processed_file_ids() -> set[str]:
+    """IDs dos ficheiros do Drive já processados automaticamente."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT drive_file_id FROM drive_processed_files"
+        ).fetchall()
+    return {r["drive_file_id"] for r in rows}
+
+
+def mark_file_processed(file_id: str, filename: str, slug: str) -> None:
+    """Marca um ficheiro do Drive como processado (idempotente)."""
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO drive_processed_files
+                (drive_file_id, filename, supermarket_slug)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (drive_file_id) DO NOTHING
+            """,
+            (file_id, filename, slug),
+        )

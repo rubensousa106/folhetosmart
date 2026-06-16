@@ -22,9 +22,11 @@ public class ScraperClient {
     private static final Logger log = LoggerFactory.getLogger(ScraperClient.class);
 
     private final RestClient restClient;
+    private final RestClient longRestClient;
 
-    public ScraperClient(RestClient scraperRestClient) {
+    public ScraperClient(RestClient scraperRestClient, RestClient scraperLongRestClient) {
         this.restClient = scraperRestClient;
+        this.longRestClient = scraperLongRestClient;
     }
 
     /**
@@ -123,6 +125,76 @@ public class ScraperClient {
             log.error("Falha ao enviar o PDF ao worker", ex);
             throw new ApiException(HttpStatus.BAD_GATEWAY,
                     "Não foi possível enviar o PDF ao automatizador. Tenta novamente.");
+        }
+    }
+
+    // --- Pipeline do ADMIN: Drive (memória) -> Claude (PDF nativo) ----------
+
+    public record UploadToDriveResponse(@JsonProperty("drive_file_id") String driveFileId) {
+    }
+
+    /** Guarda o PDF no Drive (em memória, substitui) e devolve o id do ficheiro. */
+    public String uploadToDrive(byte[] pdfBytes, String driveFilename) {
+        ByteArrayResource pdf = new ByteArrayResource(pdfBytes) {
+            @Override
+            public String getFilename() {
+                return driveFilename;
+            }
+        };
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("file", pdf);
+        body.add("drive_filename", driveFilename);
+        try {
+            UploadToDriveResponse resp = longRestClient.post()
+                    .uri("/upload-to-drive")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(body)
+                    .retrieve()
+                    .body(UploadToDriveResponse.class);
+            log.info("Folheto guardado no Drive via worker ({})", driveFilename);
+            return resp == null ? null : resp.driveFileId();
+        } catch (Exception ex) {
+            log.error("Falha ao guardar o folheto no Drive (worker)", ex);
+            throw new ApiException(HttpStatus.BAD_GATEWAY,
+                    "Não foi possível guardar o folheto no Google Drive. Tenta novamente.");
+        }
+    }
+
+    public record ProcessFlyerRequest(
+            @JsonProperty("drive_file_id") String driveFileId,
+            @JsonProperty("supermarket_slug") String supermarketSlug,
+            @JsonProperty("valid_from") String validFrom,
+            @JsonProperty("valid_until") String validUntil,
+            @JsonProperty("sync_run_id") String syncRunId
+    ) {
+    }
+
+    public record ProcessFlyerResult(
+            @JsonProperty("products_imported") int productsImported,
+            @JsonProperty("status") String status
+    ) {
+    }
+
+    /**
+     * Pede ao worker que descarregue o PDF do Drive (memória), corra a Claude
+     * API e persista. Chamada SÍNCRONA — bloqueia até ~1-2 min (longRestClient).
+     */
+    public ProcessFlyerResult processFlyer(String driveFileId, String slug,
+                                           String validFrom, String validUntil, UUID syncRunId) {
+        try {
+            ProcessFlyerResult resp = longRestClient.post()
+                    .uri("/process-flyer")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(new ProcessFlyerRequest(driveFileId, slug, validFrom, validUntil,
+                            syncRunId == null ? null : syncRunId.toString()))
+                    .retrieve()
+                    .body(ProcessFlyerResult.class);
+            log.info("Folheto processado pelo worker (slug={}, drive={})", slug, driveFileId);
+            return resp == null ? new ProcessFlyerResult(0, "error") : resp;
+        } catch (Exception ex) {
+            log.error("Falha ao processar o folheto (worker)", ex);
+            throw new ApiException(HttpStatus.BAD_GATEWAY,
+                    "Não foi possível processar o folheto. Tenta novamente.");
         }
     }
 }

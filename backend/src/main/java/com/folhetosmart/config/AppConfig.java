@@ -39,4 +39,21 @@ public class AppConfig {
                 .baseUrl(baseUrl)
                 .build();
     }
+
+    /**
+     * Cliente HTTP de longa duração para o pipeline do ADMIN
+     * (upload-to-drive + process-flyer). A extração com IA é SÍNCRONA e pode
+     * demorar 1-2 min, pelo que o read timeout tem de ser bem mais alto.
+     */
+    @Bean
+    public RestClient scraperLongRestClient(RestClient.Builder builder,
+                                            @Value("${folheto.scraper.url}") String baseUrl) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5_000);
+        factory.setReadTimeout(180_000);   // 3 min — folga para a extração IA
+        return builder
+                .requestFactory(factory)
+                .baseUrl(baseUrl)
+                .build();
+    }
 }

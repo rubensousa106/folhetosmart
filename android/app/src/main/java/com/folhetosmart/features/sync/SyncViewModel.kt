@@ -11,8 +11,11 @@ import com.folhetosmart.data.api.SyncStatusDto
 import com.folhetosmart.data.repository.SyncRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
@@ -35,12 +38,19 @@ class SyncViewModel(
     private val _uiState = MutableStateFlow<SyncUiState>(SyncUiState.Loading)
     val uiState: StateFlow<SyncUiState> = _uiState.asStateFlow()
 
+    // Eventos one-shot (Snackbar de "Verificar agora") — só em verificação manual.
+    private val _events = MutableSharedFlow<SyncEvent>(extraBufferCapacity = 1)
+    val events: SharedFlow<SyncEvent> = _events.asSharedFlow()
+
     init {
-        verify()
+        // Carga automática inicial — sem Snackbar.
+        verify(manual = false)
     }
 
     /** Botão "Verificar agora" — lê o estado da BD (30s máx). NÃO processa nada. */
-    fun verify() {
+    fun verify() = verify(manual = true)
+
+    private fun verify(manual: Boolean) {
         viewModelScope.launch {
             // A lista nunca desaparece: se já há conteúdo, mostra a barra no topo.
             (_uiState.value as? SyncUiState.Content)?.let {
@@ -48,7 +58,9 @@ class SyncViewModel(
             }
             try {
                 val (status, fromCache) = withTimeout(TIMEOUT_MS) { repository.status() }
-                _uiState.value = toContent(status, fromCache)
+                val content = toContent(status, fromCache)
+                _uiState.value = content
+                if (manual) _events.tryEmit(SyncEvent.Checked(content.hasData))
             } catch (e: TimeoutCancellationException) {
                 onCheckFailure("⚠️ Sem resposta. Verifica a tua ligação e tenta novamente.")
             } catch (e: CancellationException) {

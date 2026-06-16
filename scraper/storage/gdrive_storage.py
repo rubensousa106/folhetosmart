@@ -152,6 +152,42 @@ class GoogleDriveStorage:
             logger.warning("Drive: falha no upload de %s: %s", filename, exc)
             return None
 
+    def upload_pdf_bytes(
+        self, data: bytes, filename: str, replace: bool = True
+    ) -> Optional[str]:
+        """Como [upload_pdf] mas a partir de bytes EM MEMÓRIA (sem disco).
+
+        Usado pelo pipeline do ADMIN (regra: o PDF nunca toca no disco do
+        servidor — só fica no Drive). Substitui o ficheiro com o mesmo nome.
+        """
+        import io
+
+        from googleapiclient.http import MediaIoBaseUpload  # lazy
+
+        try:
+            existing = self._find_by_name(filename)
+            if existing and not replace:
+                logger.info("Drive: %s já existe — não duplica", filename)
+                return existing
+
+            media = MediaIoBaseUpload(
+                io.BytesIO(data), mimetype="application/pdf", resumable=False
+            )
+            if existing:
+                self.service.files().update(fileId=existing, media_body=media).execute()
+                logger.info("Drive: %s substituído (memória)", filename)
+                return existing
+
+            meta = {"name": filename, "parents": [self.folder_id]}
+            created = self.service.files().create(
+                body=meta, media_body=media, fields="id"
+            ).execute()
+            logger.info("Drive: carregado %s (memória)", filename)
+            return created.get("id")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Drive: falha no upload (memória) de %s: %s", filename, exc)
+            return None
+
     def _find_by_name(self, filename: str) -> Optional[str]:
         query = (
             f"'{self.folder_id}' in parents and name='{filename}' "

@@ -1,13 +1,17 @@
 package com.folhetosmart.sync;
 
 import com.folhetosmart.sync.dto.AdminFlyersStatusResponse;
+import com.folhetosmart.sync.dto.AdminProcessFlyerRequest;
+import com.folhetosmart.sync.dto.AdminProcessFlyerResponse;
 import com.folhetosmart.sync.dto.AdminUploadResponse;
+import com.folhetosmart.sync.dto.AdminUploadToDriveResponse;
 import com.folhetosmart.sync.dto.SyncTriggerResponse;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -45,6 +49,32 @@ public class AdminController {
             @RequestPart("file") MultipartFile file) {
         return ResponseEntity.accepted()
                 .body(adminService.uploadFlyer(supermarketSlug, validFrom, validUntil, file));
+    }
+
+    /**
+     * POST /api/v1/admin/upload-to-drive — passo 1 do pipeline novo: guarda o
+     * PDF no Google Drive (em memória) e devolve { drive_file_id, filename }.
+     */
+    @PostMapping(value = "/upload-to-drive", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<AdminUploadToDriveResponse> uploadToDrive(
+            @RequestParam("supermarket_slug") String supermarketSlug,
+            @RequestParam("valid_from") String validFrom,
+            @RequestParam("valid_until") String validUntil,
+            @RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(
+                adminService.uploadToDrive(supermarketSlug, validFrom, validUntil, file));
+    }
+
+    /**
+     * POST /api/v1/admin/process-flyer — passo 2 (SÍNCRONO, ~1-2 min):
+     * descarrega o PDF do Drive, extrai com a Claude API e persiste. Devolve
+     * { products_imported, status }.
+     */
+    @PostMapping("/process-flyer")
+    public ResponseEntity<AdminProcessFlyerResponse> processFlyer(
+            @RequestBody AdminProcessFlyerRequest body) {
+        return ResponseEntity.ok(adminService.processFlyer(
+                body.supermarketSlug(), body.validFrom(), body.validUntil(), body.driveFileId()));
     }
 
     /** GET /api/v1/admin/flyers/status — estado dos folhetos da semana atual. */

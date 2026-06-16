@@ -1,6 +1,7 @@
 package com.folhetosmart.features.sync
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,16 +27,23 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,16 +71,43 @@ fun SyncScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showAdminSheet by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    when (val s = state) {
-        is SyncUiState.Loading -> LoadingView("A carregar promoções…")
-        is SyncUiState.Error -> ErrorView(s.message, onRetry = viewModel::verify)
-        is SyncUiState.Content -> SyncContent(
-            s = s,
-            isAdmin = isAdmin,
-            onVerify = viewModel::verify,
-            onOpenAdmin = { showAdminSheet = true }
-        )
+    // Feedback de "Verificar agora": Snackbar verde se há dados, neutro se não.
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is SyncEvent.Checked -> snackbarHostState.showSnackbar(
+                    if (event.hasData) "✅ Dados atualizados" else "Sem novidades por enquanto"
+                )
+            }
+        }
+    }
+
+    Scaffold(
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                val success = data.visuals.message.startsWith("✅")
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = if (success) FolhetoSmartGreen else SnackbarDefaults.color,
+                    contentColor = if (success) Color.White else SnackbarDefaults.contentColor
+                )
+            }
+        }
+    ) { padding ->
+        Box(Modifier.padding(padding)) {
+            when (val s = state) {
+                is SyncUiState.Loading -> LoadingView("A carregar promoções…")
+                is SyncUiState.Error -> ErrorView(s.message, onRetry = viewModel::verify)
+                is SyncUiState.Content -> SyncContent(
+                    s = s,
+                    isAdmin = isAdmin,
+                    onVerify = viewModel::verify,
+                    onOpenAdmin = { showAdminSheet = true }
+                )
+            }
+        }
     }
 
     if (showAdminSheet) {
@@ -153,7 +188,7 @@ private fun SyncContent(
                     enabled = !s.checking,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("🔄  Verificar agora")
+                    Text(if (s.checking) "A verificar…" else "🔄  Verificar agora")
                 }
 
                 if (s.offline) {

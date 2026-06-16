@@ -11,12 +11,14 @@ import com.folhetosmart.data.api.SupermarketStatusDto
 import com.folhetosmart.data.api.SyncStatusDto
 import com.folhetosmart.data.repository.AdminRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import retrofit2.HttpException
 
 /**
@@ -92,11 +94,41 @@ class AdminViewModel(
         if (s.isBusy) return
 
         viewModelScope.launch {
-            _uiState.update { it.copy(phase = UploadPhase.Uploading) }
             try {
-                val resp = repository.uploadFlyer(slug, s.validFrom, s.validUntil, picked.bytes)
+                // Passo 1 — guardar no Drive (☁️ A enviar para o Google Drive…).
+                _uiState.update { it.copy(phase = UploadPhase.Uploading) }
+                val drive = repository.uploadToDrive(slug, s.validFrom, s.validUntil, picked.bytes)
+                val driveId = drive.driveFileId
+                    ?: throw IllegalStateException("Sem id do Drive")
+
+                // Passo 2 — extrair com IA (🤖). Síncrono; corta aos 2 min.
                 _uiState.update { it.copy(phase = UploadPhase.Processing) }
-                pollRun(resp.syncRunId, slug)
+                val result = withTimeout(PROCESS_TIMEOUT_MS) {
+                    repository.processFlyer(driveId, slug, s.validFrom, s.validUntil)
+                }
+
+                if (result.status == "success" && result.productsImported > 0) {
+                    try {
+                        refreshStatus()   // atualiza a lista de folhetos
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // best-effort: o número importado já veio na resposta
+                    }
+                    _uiState.update {
+                        it.copy(phase = UploadPhase.Done(result.productsImported), picked = null)
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(phase = UploadPhase.Error(
+                            "A extração não devolveu produtos. Verifica o PDF."))
+                    }
+                }
+            } catch (e: TimeoutCancellationException) {
+                _uiState.update {
+                    it.copy(phase = UploadPhase.Error(
+                        "⚠️ O processamento está a demorar. Tenta novamente mais tarde."))
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -262,6 +294,8 @@ class AdminViewModel(
 
     companion object {
         private const val POLL_INTERVAL_MS = 2_000L
+        // Upload ADMIN (pipeline novo): a extração com IA corta aos 2 min.
+        private const val PROCESS_TIMEOUT_MS = 2 * 60 * 1000L
         // Tempo-limite de 2 min por supermercado (a IA demora ~30-60s por PDF).
         private const val PER_MARKET_TIMEOUT_MS = 2 * 60 * 1000L
         private const val MAX_POLLS = 60 // upload de 1 supermercado: ~2 minutos

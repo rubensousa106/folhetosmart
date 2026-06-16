@@ -107,3 +107,59 @@ async def process_pdf(
         "pdf": target.name,
         "drive_file_id": drive_file_id,
     }
+
+
+@app.post("/upload-to-drive")
+async def upload_to_drive(
+    file: UploadFile = File(...),
+    drive_filename: str = Form(...),
+) -> dict:
+    """Guarda um PDF no Google Drive a partir de memória (pipeline ADMIN).
+
+    O PDF NUNCA é escrito no disco do servidor — vai direto para o Drive
+    (substitui se já existir). Devolve o id do ficheiro no Drive.
+    """
+    data = await file.read()
+    if not data.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="O ficheiro não é um PDF válido.")
+
+    from storage.gdrive_storage import drive_storage
+
+    if not drive_storage.is_configured():
+        raise HTTPException(status_code=503, detail="Google Drive não está configurado.")
+
+    drive_file_id = drive_storage.upload_pdf_bytes(data, drive_filename, replace=True)
+    if not drive_file_id:
+        raise HTTPException(status_code=502, detail="Falha ao guardar no Google Drive.")
+    return {"drive_file_id": drive_file_id}
+
+
+class ProcessFlyerRequest(BaseModel):
+    drive_file_id: str
+    supermarket_slug: str
+    valid_from: str
+    valid_until: str
+    sync_run_id: str | None = Field(None)
+
+
+@app.post("/process-flyer")
+def process_flyer(req: ProcessFlyerRequest) -> dict:
+    """Descarrega o PDF do Drive (memória), extrai com IA e persiste.
+
+    É SÍNCRONO (a app espera ~1-2 min): a Claude API só é chamada aqui, 1× por
+    PDF, e o backend bloqueia até haver resultado. O PDF fica só no Drive.
+    """
+    summary = pipeline.run_drive_flyer_sync(
+        req.drive_file_id,
+        req.supermarket_slug,
+        req.valid_from,
+        req.valid_until,
+        sync_run_id=req.sync_run_id,
+    )
+    imported = summary.per_supermarket.get(req.supermarket_slug, 0)
+    status = "success" if imported > 0 and not summary.errors else "error"
+    return {
+        "products_imported": imported,
+        "status": status,
+        "matched": summary.products_matched,
+    }

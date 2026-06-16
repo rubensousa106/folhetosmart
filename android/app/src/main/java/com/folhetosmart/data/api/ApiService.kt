@@ -6,6 +6,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Headers
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -126,4 +127,20 @@ interface ApiService {
 
     @POST("api/v1/admin/sync/trigger")
     suspend fun adminTrigger(): SyncTriggerDto
+
+    // Pipeline novo (2 passos): Drive (memória) -> Claude (PDF nativo).
+    @Multipart
+    @Headers("X-Long-Timeout: 1")
+    @POST("api/v1/admin/upload-to-drive")
+    suspend fun adminUploadToDrive(
+        @Part("supermarket_slug") supermarketSlug: RequestBody,
+        @Part("valid_from") validFrom: RequestBody,
+        @Part("valid_until") validUntil: RequestBody,
+        @Part file: MultipartBody.Part
+    ): AdminUploadToDriveDto
+
+    /** Síncrono (~1-2 min) — a extração com IA corre aqui; usa timeout longo. */
+    @Headers("X-Long-Timeout: 1")
+    @POST("api/v1/admin/process-flyer")
+    suspend fun adminProcessFlyer(@Body request: ProcessFlyerRequest): ProcessFlyerResponseDto
 }

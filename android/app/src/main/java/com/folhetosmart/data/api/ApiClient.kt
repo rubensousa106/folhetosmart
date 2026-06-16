@@ -13,6 +13,13 @@ import java.util.concurrent.TimeUnit
 /** Constrói o [ApiService] do Retrofit. */
 object ApiClient {
 
+    /**
+     * Cabeçalho que sinaliza um pedido de longa duração (extração com IA do
+     * folheto, ~1-2 min). O interceptor sobe o read/write timeout só nesse
+     * pedido e remove o cabeçalho antes de o enviar.
+     */
+    const val HEADER_LONG_TIMEOUT = "X-Long-Timeout"
+
     /** Gson partilhado (também usado pela cache Room para round-trip do JSON). */
     val gson = GsonBuilder()
         // Mapeia camelCase (Kotlin) <-> snake_case (JSON da API).
@@ -44,8 +51,21 @@ object ApiClient {
             chain.proceed(withAuth)
         }
 
+        // Pedidos com X-Long-Timeout (process-flyer) usam um read timeout alto.
+        val timeoutInterceptor = Interceptor { chain ->
+            val request = chain.request()
+            if (request.header(HEADER_LONG_TIMEOUT) != null) {
+                chain.withReadTimeout(180, TimeUnit.SECONDS)
+                    .withWriteTimeout(60, TimeUnit.SECONDS)
+                    .proceed(request.newBuilder().removeHeader(HEADER_LONG_TIMEOUT).build())
+            } else {
+                chain.proceed(request)
+            }
+        }
+
         val http = OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
+            .addInterceptor(timeoutInterceptor)
             .addInterceptor(logging)
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
