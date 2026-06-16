@@ -23,25 +23,17 @@ databases:
 services:
   - type: web
     name: folhetosmart-backend
-    runtime: docker
-    plan: free
-    region: frankfurt
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
-    healthCheckPath: /actuator/health
-    autoDeploy: true
+    runtime: python
+    buildCommand: |
+      apt-get update
+      apt-get install -y tesseract-ocr tesseract-ocr-por poppler-utils
+      pip install -r scraper/requirements.txt
+    startCommand: python -m backend.app
     envVars:
-      # --- Base de dados (Render injeta cada propriedade da BD acima) ---
-      - key: DB_HOST
-        fromDatabase: { name: folhetosmart-db, property: host }
-      - key: DB_PORT
-        fromDatabase: { name: folhetosmart-db, property: port }
-      - key: DB_NAME
-        fromDatabase: { name: folhetosmart-db, property: database }
-      - key: DB_USER
-        fromDatabase: { name: folhetosmart-db, property: user }
-      - key: DB_PASSWORD
-        fromDatabase: { name: folhetosmart-db, property: password }
+      - key: PYTHONUNBUFFERED
+        value: true
+      - key: TESSERACT_CMD
+        value: /usr/bin/tesseract
 
       # --- Segurança ---
       - key: FOLHETO_REQUIRE_HTTPS
@@ -62,3 +54,4 @@ services:
       # --- JVM dentro dos 512 MB do plano grátis ---
       - key: JAVA_TOOL_OPTIONS
         value: "-XX:MaxRAMPercentage=75.0"
+

@@ -10,6 +10,14 @@ pdf2image>=1.17
 Pillow>=10.0
 opencv-python-headless>=4.9       # pré-processamento de imagem para OCR (sem GUI)
 numpy>=1.26
+# requirements.txt
+pdfplumber==0.10.3
+pdf2image==1.16.3
+pytesseract==0.3.10
+Pillow==10.1.0
+google-api-python-client==2.108.0
+google-auth-oauthlib==1.1.0
+requests==2.31.0
 
 # --- Google Drive (salvaguarda de folhetos PDF) ---
 google-api-python-client>=2.130

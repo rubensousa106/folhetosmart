@@ -1,174 +1,176 @@
-"""OCR de folhetos com agrupamento espacial em blocos de produto.
-
-O problema do `image_to_string` é colapsar o layout multi-coluna do folheto:
-num folheto de 3-4 colunas o texto fica intercalado/partido e a extração
-linha-a-linha falha. A abordagem correta usa `image_to_data` (palavras com
-coordenadas + confiança) e reconstrói os blocos de produto por proximidade
-espacial, respeitando as colunas (block/par do Tesseract).
-
-Saída: lista de "blocos" (cada bloco = texto multi-linha de um candidato a
-produto), que o `flyer_parser` transforma em RawProduct.
-
-Requisitos de sistema (Dockerfile): tesseract-ocr + tesseract-ocr-por,
-poppler-utils, libgomp1/libglib (OpenCV headless).
-"""
-from __future__ import annotations
-
+import os
 import logging
-from collections import OrderedDict
+import tempfile
 from pathlib import Path
-from typing import Sequence, Union
+import pdfplumber
+import pytesseract
+from pdf2image import convert_from_path
+from PIL import Image
+import re
 
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-OCR_LANG = "por"
-# psm 3 = segmentação automática (deteta colunas/blocos); oem 3 = LSTM.
-OCR_CONFIG = "--oem 3 --psm 3"
-DEFAULT_DPI = 300
-MIN_CONF = 60          # confiança mínima por palavra (0-100)
-BLOCK_GAP_FACTOR = 1.8  # gap vertical > 1.8x altura de linha -> novo bloco
+class PDFExtractor:
+    """Classe para extrair texto de PDFs (texto ou imagem)"""
 
+    def __init__(self, tesseract_cmd=None):
+        """
+        Inicializa o extrator de PDFs
 
-# --- API pública (blocos) ---------------------------------------------------
-def extract_blocks_from_pdf(pdf_path: Union[str, Path], *, dpi: int = DEFAULT_DPI) -> list[str]:
-    """Converte o PDF (300 DPI) e devolve os blocos de produto de todas as páginas."""
-    from pdf2image import convert_from_path  # lazy
+        Args:
+            tesseract_cmd: Caminho para o executável do Tesseract (opcional)
+        """
+        if tesseract_cmd:
+            pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+        self.temp_dir = tempfile.gettempdir()
 
-    pages = convert_from_path(str(pdf_path), dpi=dpi, fmt="png", thread_count=4)
-    logger.info("OCR de %s — %d páginas a %d DPI", pdf_path, len(pages), dpi)
+    def extract_text(self, pdf_path):
+        """
+        Extrai texto de um PDF, usando OCR se necessário
 
-    blocks: list[str] = []
-    for i, page in enumerate(pages, start=1):
-        page_blocks = extract_blocks_from_image(page)
-        logger.info("Página %d: %d blocos de texto", i, len(page_blocks))
-        blocks.extend(page_blocks)
-    return blocks
+        Args:
+            pdf_path: Caminho para o ficheiro PDF
 
+        Returns:
+            str: Texto extraído ou None se falhar
+        """
+        if not os.path.exists(pdf_path):
+            logger.error(f"Ficheiro não encontrado: {pdf_path}")
+            return None
 
-def extract_blocks_from_images(image_paths: Sequence[Union[str, Path]]) -> list[str]:
-    """Blocos de produto a partir de imagens (screenshots de viewers)."""
-    from PIL import Image  # lazy
-
-    blocks: list[str] = []
-    for i, path in enumerate(image_paths, start=1):
-        page_blocks = extract_blocks_from_image(Image.open(path))
-        logger.info("Imagem %d (%s): %d blocos", i, Path(path).name, len(page_blocks))
-        blocks.extend(page_blocks)
-    return blocks
-
-
-def extract_blocks_from_image(pil_image) -> list[str]:
-    """Pré-processa, corre OCR com coordenadas e agrupa em blocos espaciais."""
-    words = _words_from_image(pil_image)
-    lines = _lines_from_words(words)
-    return _blocks_from_lines(lines)
-
-
-# --- API pública (texto — compatibilidade) ----------------------------------
-def extract_text_from_pdf(pdf_path: Union[str, Path], *, dpi: int = DEFAULT_DPI) -> str:
-    return "\n\n".join(extract_blocks_from_pdf(pdf_path, dpi=dpi))
-
-
-def extract_text_from_images(image_paths: Sequence[Union[str, Path]]) -> str:
-    return "\n\n".join(extract_blocks_from_images(image_paths))
-
-
-def extract_text_from_image(image_path: Union[str, Path]) -> str:
-    from PIL import Image  # lazy
-
-    return "\n\n".join(extract_blocks_from_image(Image.open(image_path)))
-
-
-# --- Núcleo: OCR com coordenadas + agrupamento espacial ---------------------
-def _words_from_image(pil_image) -> list[dict]:
-    """Palavras com posição e (block, par, line) do Tesseract, filtradas por conf."""
-    import pytesseract  # lazy
-    from pytesseract import Output  # lazy
-
-    processed = _preprocess(pil_image)
-    data = pytesseract.image_to_data(
-        processed, lang=OCR_LANG, config=OCR_CONFIG, output_type=Output.DICT
-    )
-
-    words: list[dict] = []
-    for i in range(len(data["text"])):
-        text = (data["text"][i] or "").strip()
-        if not text:
-            continue
         try:
-            conf = float(data["conf"][i])
-        except (TypeError, ValueError):
-            conf = -1.0
-        if conf < MIN_CONF:
-            continue
-        words.append({
-            "text": text,
-            "left": int(data["left"][i]),
-            "top": int(data["top"][i]),
-            "height": int(data["height"][i]),
-            "block": int(data["block_num"][i]),
-            "par": int(data["par_num"][i]),
-            "line": int(data["line_num"][i]),
-            "word": int(data["word_num"][i]),
-        })
-    return words
+            logger.info(f"A processar: {pdf_path}")
 
+            # Primeiro, tenta extrair texto diretamente
+            with pdfplumber.open(pdf_path) as pdf:
+                text = ""
+                for page_num, page in enumerate(pdf.pages, 1):
+                    page_text = page.extract_text()
+                    if page_text and page_text.strip():
+                        text += f"\n--- Página {page_num} ---\n"
+                        text += page_text
+                        logger.info(f"Página {page_num}: Texto extraído ({len(page_text)} caracteres)")
+                    else:
+                        logger.warning(f"Página {page_num}: Sem texto - a usar OCR")
+                        # Se não houver texto, usa OCR
+                        ocr_text = self._extract_with_ocr(pdf_path, page_num - 1)
+                        if ocr_text:
+                            text += f"\n--- Página {page_num} (OCR) ---\n"
+                            text += ocr_text
 
-def _lines_from_words(words: list[dict]) -> list[dict]:
-    """Junta palavras na mesma linha (chave block/par/line do Tesseract)."""
-    groups: "OrderedDict[tuple, list]" = OrderedDict()
-    for w in words:
-        groups.setdefault((w["block"], w["par"], w["line"]), []).append(w)
+                if not text.strip():
+                    logger.warning("Nenhum texto encontrado no PDF")
+                    return None
 
-    lines: list[dict] = []
-    for (block, par, _line), ws in groups.items():
-        ws.sort(key=lambda w: w["word"])
-        lines.append({
-            "text": " ".join(w["text"] for w in ws),
-            "top": min(w["top"] for w in ws),
-            "bottom": max(w["top"] + w["height"] for w in ws),
-            "block": block,
-            "par": par,
-        })
-    # Ordena por coluna/região e depois verticalmente.
-    lines.sort(key=lambda ln: (ln["block"], ln["par"], ln["top"]))
-    return lines
+                return text
 
+        except Exception as e:
+            logger.error(f"Erro ao extrair texto: {e}")
+            return None
 
-def _blocks_from_lines(lines: list[dict]) -> list[str]:
-    """Agrupa linhas em blocos: mesma região (block/par) e gap vertical pequeno.
+    def _extract_with_ocr(self, pdf_path, page_num):
+        """
+        Extrai texto de uma página usando OCR
 
-    Um parágrafo do Tesseract corresponde tipicamente a um produto; ainda assim
-    dividimos por gap vertical grande, caso dois produtos caiam no mesmo par.
-    """
-    if not lines:
-        return []
+        Args:
+            pdf_path: Caminho para o PDF
+            page_num: Número da página (0-indexed)
 
-    heights = sorted(ln["bottom"] - ln["top"] for ln in lines)
-    median_h = heights[len(heights) // 2] or 30
-    block_gap = median_h * BLOCK_GAP_FACTOR
+        Returns:
+            str: Texto extraído ou None
+        """
+        try:
+            logger.info(f"A converter página {page_num+1} para imagem...")
+            images = convert_from_path(
+                pdf_path,
+                first_page=page_num+1,
+                last_page=page_num+1,
+                dpi=300
+            )
 
-    blocks: list[list[str]] = []
-    current: list[str] = [lines[0]["text"]]
-    for prev, line in zip(lines, lines[1:]):
-        same_region = (line["block"], line["par"]) == (prev["block"], prev["par"])
-        gap = line["top"] - prev["bottom"]
-        if same_region and gap < block_gap:
-            current.append(line["text"])
-        else:
-            blocks.append(current)
-            current = [line["text"]]
-    blocks.append(current)
+            if not images:
+                logger.error("Falha ao converter página para imagem")
+                return None
 
-    return ["\n".join(b) for b in blocks]
+            logger.info("A executar OCR...")
+            # Configurar Tesseract para português
+            custom_config = r'--oem 3 --psm 6 -l por'
+            text = pytesseract.image_to_string(images[0], config=custom_config)
 
+            logger.info(f"OCR concluído: {len(text)} caracteres extraídos")
+            return text
 
-def _preprocess(pil_image):
-    """Cinzento -> CLAHE (contraste local) -> denoise. Melhora muito o OCR."""
-    import cv2  # lazy
-    import numpy as np  # lazy
+        except Exception as e:
+            logger.error(f"Erro no OCR: {e}")
+            return None
 
-    img = np.array(pil_image.convert("RGB"))
-    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    enhanced = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
-    return cv2.fastNlMeansDenoising(enhanced, h=10)
+    def extract_structured_data(self, pdf_path):
+        """
+        Extrai dados estruturados (produtos e preços) do PDF
+
+        Args:
+            pdf_path: Caminho para o PDF
+
+        Returns:
+            list: Lista de dicionários com produto e preço
+        """
+        text = self.extract_text(pdf_path)
+        if not text:
+            return []
+
+        # Padrões para diferentes formatos de preço
+        patterns = [
+            # Padrão: "produto 5,99€"
+            r'([A-Za-zçãõáéíóúÀ-Ú\s\-\.]+?)\s+([\d,]+)\s*[€]',
+            # Padrão: "5,99€ produto"
+            r'([\d,]+)\s*[€]\s+([A-Za-zçãõáéíóúÀ-Ú\s\-\.]+)',
+            # Padrão: "produto €5,99"
+            r'([A-Za-zçãõáéíóúÀ-Ú\s\-\.]+?)\s*[€]\s*([\d,]+)',
+            # Padrão: "produto 5.99"
+            r'([A-Za-zçãõáéíóúÀ-Ú\s\-\.]+?)\s+([\d]+\.[\d]{2})',
+        ]
+
+        products = []
+        lines = text.split('\n')
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            for pattern in patterns:
+                matches = re.findall(pattern, line, re.IGNORECASE)
+                for match in matches:
+                    if len(match) == 2:
+                        # Determina qual é o produto e qual é o preço
+                        if re.match(r'^[\d,\.]+$', match[0]):
+                            price, product = match
+                        else:
+                            product, price = match
+
+                        # Limpa e converte o preço
+                        price = price.replace(',', '.').replace('€', '').strip()
+                        try:
+                            price_float = float(price)
+                            products.append({
+                                'produto': product.strip(),
+                                'preco': price_float,
+                                'raw_line': line
+                            })
+                        except ValueError:
+                            continue
+
+        return products
+
+# Função helper para uso rápido
+def extract_from_pdf(pdf_path):
+    """Função simples para extrair texto de um PDF"""
+    extractor = PDFExtractor()
+    return extractor.extract_text(pdf_path)
+
+def extract_products_from_pdf(pdf_path):
+    """Função simples para extrair produtos e preços"""
+    extractor = PDFExtractor()
+    return extractor.extract_structured_data(pdf_path)
