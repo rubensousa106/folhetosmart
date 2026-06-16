@@ -1,21 +1,89 @@
-# pdf_extractor.py - VERSÃO COM IA (SUBSTITUI O ANTIGO)
+# pdf_extractor.py - VERSÃO COMPLETA CORRIGIDA (SEM IMPORT CIRCULAR)
 import os
 import json
 import logging
+import re
 import pdfplumber
 from anthropic import Anthropic
+
+# ============================================================
+# CARREGAR .env
+# ============================================================
+def load_env_file():
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), '.env'),
+        os.path.join(os.path.dirname(__file__), '..', '.env'),
+        os.path.join(os.getcwd(), '.env'),
+        '.env',
+    ]
+    for env_path in possible_paths:
+        if os.path.exists(env_path):
+            print(f"✅ .env encontrado em: {env_path}")
+            with open(env_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        os.environ[key.strip()] = value.strip()
+            return True
+    print("❌ .env NÃO encontrado")
+    return False
+
+load_env_file()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class PDFExtractor:
-    """Extrator de produtos usando IA (Claude) para PDFs complexos"""
-
-    def __init__(self, api_key=None):
+    def __init__(self, api_key=None, model=None):
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
-        if not self.api_key:
-            logger.warning("ANTHROPIC_API_KEY não configurada - a usar fallback")
-        self.client = Anthropic(api_key=self.api_key) if self.api_key else None
+        self.model = model or os.getenv("ANTHROPIC_MODEL")
+
+        if not self.model:
+            raise ValueError("❌ ANTHROPIC_MODEL não definido no .env!")
+
+        print(f"🔑 API Key: {'✅' if self.api_key else '❌'}")
+        print(f"📦 Modelo: {self.model}")
+
+        if self.api_key:
+            self.client = Anthropic(api_key=self.api_key)
+            logger.info(f"✅ Claude API configurada (global) - modelo: {self.model}")
+        else:
+            self.client = None
+            logger.warning("⚠️ ANTHROPIC_API_KEY não configurada")
+
+    def detectar_supermercado(self, pdf_path):
+        """Deteta o supermercado a partir do texto do PDF ou nome do ficheiro"""
+        text = self.extract_text_from_pdf(pdf_path)
+        if text:
+            texto_lower = text.lower()
+            supermercados = {
+                "continente": "Continente",
+                "pingo doce": "Pingo Doce",
+                "pingodoce": "Pingo Doce",
+                "lidl": "Lidl",
+                "aldi": "Aldi",
+                "intermarche": "Intermarché",
+                "intermarché": "Intermarché"
+            }
+            for chave, nome in supermercados.items():
+                if chave in texto_lower:
+                    return nome
+
+        nome_ficheiro = os.path.basename(pdf_path).lower()
+        supermercados = {
+            "continente": "Continente",
+            "pingo": "Pingo Doce",
+            "lidl": "Lidl",
+            "aldi": "Aldi",
+            "intermarche": "Intermarché",
+            "intermarché": "Intermarché"
+        }
+        for chave, nome in supermercados.items():
+            if chave in nome_ficheiro:
+                return nome
+
+        return "Desconhecido"
 
     def extract_text_from_pdf(self, pdf_path):
         """Extrai texto bruto do PDF"""
@@ -30,14 +98,17 @@ class PDFExtractor:
                     text = page.extract_text()
                     if text:
                         full_text += f"\n=== PÁGINA {page_num} ===\n{text}"
-
             return full_text
         except Exception as e:
-            logger.error(f"Erro ao extrair texto: {e}")
+            logger.error(f"Erro: {e}")
             return None
 
-    def extract_structured_data(self, pdf_path, supermarket="Continente"):
-        """Extrai produtos usando IA"""
+    def extract_structured_data_por_paginas(self, pdf_path, supermarket=None):
+        """Extrai produtos página a página com IA - processa TODAS as páginas com conteúdo"""
+        if supermarket is None:
+            supermarket = self.detectar_supermercado(pdf_path)
+            logger.info(f"🛒 Supermercado detetado: {supermarket}")
+
         if not self.client:
             logger.error("Claude API não disponível")
             return self._fallback_extraction(pdf_path)
@@ -46,55 +117,95 @@ class PDFExtractor:
         if not text:
             return []
 
-        # Pega apenas as páginas com produtos (ajuste conforme necessário)
         pages = text.split("=== PÁGINA")
-        product_pages = pages[2:-2] if len(pages) > 4 else pages
-        limited_text = "".join(product_pages)[:8000]
+        todos_produtos = []
+        produtos_vistos = set()
 
-        prompt = f"""
-        Extrai todos os produtos e preços deste folheto do supermercado {supermarket}.
+        # Processa TODAS as páginas com conteúdo
+        paginas_para_processar = []
+        for i, page_text in enumerate(pages):
+            if not page_text.strip() or len(page_text.strip()) < 50:
+                continue
+            if i == len(pages) - 1:  # Ignora a última página (info legal)
+                continue
+            paginas_para_processar.append((i, page_text))
 
-        Regras:
-        1. Identifica o nome do produto (pode estar em várias linhas)
-        2. Identifica o preço (pode ser "5,99€", "5.99", "5,99")
-        3. Ignora códigos de barras, percentagens, descrições longas
-        4. Devolve apenas uma lista JSON com: {{"produto": "nome", "preco": 5.99}}
-        5. Se o preço for por KG, converte para o preço normal
+        logger.info(f"📄 A processar {len(paginas_para_processar)} páginas com conteúdo")
 
-        Texto do folheto:
-        {limited_text}
+        for i, page_text in paginas_para_processar:
+            logger.info(f"📄 A processar página {i+1}...")
+            page_text_limited = page_text[:8000]
 
-        Responde APENAS com um JSON válido, sem mais texto.
-        """
+            prompt = f"""
+            Extrai todos os produtos e preços desta página do folheto do supermercado {supermarket}.
 
-        try:
-            response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=4096,
-                temperature=0.1,
-                messages=[{"role": "user", "content": prompt}]
-            )
+            Regras:
+            1. Identifica o nome do produto (pode estar em várias linhas)
+            2. Identifica o preço (apenas o número, sem "€" ou "KG")
+            3. Devolve APENAS um array JSON válido
 
-            result = response.content[0].text.strip()
-            # Limpa markdown
-            if result.startswith("```json"):
-                result = result[7:]
-            if result.endswith("```"):
-                result = result[:-3]
+            Exemplo: [{{"produto": "Bacalhau Graúdo", "preco": 17.99}}]
 
-            products = json.loads(result)
+            Texto da página:
+            {page_text_limited}
 
-            if isinstance(products, dict) and "produtos" in products:
-                products = products["produtos"]
-            elif isinstance(products, dict):
-                products = [products]
+            Responde APENAS com o JSON, sem mais texto.
+            """
 
-            logger.info(f"✅ Extraídos {len(products)} produtos com IA")
-            return products
+            try:
+                response = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=4096,
+                    temperature=0.1,
+                    messages=[{"role": "user", "content": prompt}]
+                )
 
-        except Exception as e:
-            logger.error(f"Erro na IA: {e}")
-            return self._fallback_extraction(pdf_path)
+                result = response.content[0].text.strip()
+
+                if result.startswith("```json"):
+                    result = result[7:]
+                if result.endswith("```"):
+                    result = result[:-3]
+                if result.startswith("```"):
+                    result = result[3:]
+
+                try:
+                    produtos_pagina = json.loads(result)
+                except json.JSONDecodeError:
+                    logger.warning(f"⚠️ Página {i+1}: JSON inválido, a tentar reparar...")
+                    json_match = re.search(r'\[\s*\{.*\}\s*\]', result, re.DOTALL)
+                    if json_match:
+                        try:
+                            produtos_pagina = json.loads(json_match.group())
+                        except:
+                            produtos_pagina = []
+                    else:
+                        produtos_pagina = []
+
+                if isinstance(produtos_pagina, list):
+                    for p in produtos_pagina:
+                        if isinstance(p, dict) and "produto" in p and "preco" in p:
+                            key = f"{p['produto'][:20]}_{p['preco']:.2f}"
+                            if key not in produtos_vistos:
+                                produtos_vistos.add(key)
+                                todos_produtos.append(p)
+                    logger.info(f"✅ Página {i+1}: {len(produtos_pagina)} produtos")
+                elif isinstance(produtos_pagina, dict) and "produtos" in produtos_pagina:
+                    for p in produtos_pagina["produtos"]:
+                        if isinstance(p, dict) and "produto" in p and "preco" in p:
+                            key = f"{p['produto'][:20]}_{p['preco']:.2f}"
+                            if key not in produtos_vistos:
+                                produtos_vistos.add(key)
+                                todos_produtos.append(p)
+                    logger.info(f"✅ Página {i+1}: {len(produtos_pagina['produtos'])} produtos")
+                else:
+                    logger.warning(f"⚠️ Página {i+1}: formato inesperado")
+
+            except Exception as e:
+                logger.error(f"❌ Página {i+1}: {e}")
+
+        logger.info(f"✅ Total: {len(todos_produtos)} produtos extraídos do {supermarket}")
+        return todos_produtos
 
     def _fallback_extraction(self, pdf_path):
         """Fallback: extração básica sem IA"""
@@ -103,34 +214,53 @@ class PDFExtractor:
         if not text:
             return []
 
-        # Padrão simples para encontrar preços
-        import re
         products = []
         lines = text.split('\n')
-        for line in lines:
-            match = re.search(r'([\d,]+)\s*[€]', line)
-            if match:
-                price = float(match.group(1).replace(',', '.'))
-                # Tenta encontrar o nome do produto antes do preço
-                parts = line.split(match.group(1))
-                if parts:
-                    product = parts[0].strip()
-                    if product and len(product) > 3:
-                        products.append({
-                            'produto': product[:50],
-                            'preco': price
-                        })
+        produtos_vistos = set()
 
+        price_pattern = re.compile(r'(\d+[,\.]\d{2})\s*[€]?')
+
+        for line in lines:
+            line = line.strip()
+            if not line or len(line) < 5:
+                continue
+
+            matches = price_pattern.findall(line)
+            for price_str in matches:
+                try:
+                    price_clean = price_str.replace(',', '.').strip()
+                    if re.match(r'^\d+\.\d{2}$', price_clean):
+                        price = float(price_clean)
+                        if 0.01 <= price <= 999.99:
+                            parts = line.split(price_str)
+                            if parts:
+                                product = parts[0].strip()
+                                product = re.sub(r'^[\d\s\-\.]+', '', product)
+                                product = re.sub(r'[^A-Za-zçãõáéíóúÀ-Ú\s\-\.]', '', product)
+                                if len(product) > 2:
+                                    key = f"{product[:20]}_{price:.2f}"
+                                    if key not in produtos_vistos:
+                                        produtos_vistos.add(key)
+                                        products.append({
+                                            'produto': product[:60],
+                                            'preco': price
+                                        })
+                except ValueError:
+                    continue
+
+        logger.info(f"✅ Fallback: {len(products)} produtos extraídos")
         return products
 
 
-# Funções helper (mantêm a compatibilidade com o test_pdf.py)
+# ============================================================
+# FUNÇÕES HELPER (FORA DA CLASSE)
+# ============================================================
 def extract_from_pdf(pdf_path):
-    """Função simples para extrair texto de um PDF"""
+    """Extrai texto do PDF"""
     extractor = PDFExtractor()
     return extractor.extract_text_from_pdf(pdf_path)
 
-def extract_products_from_pdf(pdf_path, supermarket="Continente"):
-    """Função simples para extrair produtos e preços"""
+def extract_products_from_pdf(pdf_path, supermarket=None):
+    """Extrai produtos do PDF usando IA (página a página)"""
     extractor = PDFExtractor()
-    return extractor.extract_structured_data(pdf_path, supermarket)
+    return extractor.extract_structured_data_por_paginas(pdf_path, supermarket)

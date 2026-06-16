@@ -1,0 +1,214 @@
+[
+  {
+    "produto": "Postas de Salmão Frescas",
+    "preco": 12.99
+  },
+  {
+    "produto": "Bacalhau Graúdo de 1ª da Islândia",
+    "preco": 9.99
+  },
+  {
+    "produto": "Camarão Inteiro Grande 20/30 Vannamei Congelado",
+    "preco": 6.19
+  },
+  {
+    "produto": "Costela/Abas c/ Osso de Vitela (Balcão de Atendimento)",
+    "preco": 4.49
+  },
+  {
+    "produto": "Peito de Entremada de Porco Continente",
+    "preco": 1.3
+  },
+  {
+    "produto": "Bacalhau Graúdo de 1ª da Noruega Continente Salgado Seco Inteiro",
+    "preco": 17.99
+  },
+  {
+    "produto": "Caras de Bacalhau Continente Salgado Seco Emb.: 700g",
+    "preco": 5.99
+  },
+  {
+    "produto": "Caldeirada de Bacalhau Continente Salgado Seco Emb.: 700g",
+    "preco": 4.99
+  },
+  {
+    "produto": "Badanas de Bacalhau Continente Salgado Seco Emb.: 700g",
+    "preco": 7.49
+  },
+  {
+    "produto": "Bacalhau do Pacífico Desfiado Continente Salgado Seco Emb.: 400g",
+    "preco": 4.99
+  },
+  {
+    "produto": "Postas e Lombo de Bacalhau MSC Congelado (Balcão de Atendimento)",
+    "preco": 11.49
+  },
+  {
+    "produto": "Posta Média de Bacalhau Congelado Continente MSC",
+    "preco": 13.49
+  },
+  {
+    "produto": "Rabos de Bacalhau Congelado Emb.: 1.2kg",
+    "preco": 10.99
+  },
+  {
+    "produto": "Filete de Paloco MSC Congelado Emb.: 1kg",
+    "preco": 12.49
+  },
+  {
+    "produto": "Lombos de Bacalhau MSC Continente Congelado Emb.: 800g",
+    "preco": 5.99
+  },
+  {
+    "produto": "Paloco Desfiado Pack Congelado Continente Emb.: 800g",
+    "preco": 9.99
+  },
+  {
+    "produto": "Ovas de Peixe Congeladas Continente Emb.: 400g",
+    "preco": 11.69
+  },
+  {
+    "produto": "Bacalhau do Pacífico Desfiado MSC Continente Demolhado Congelado Emb.: 500g",
+    "preco": 5.29
+  },
+  {
+    "produto": "Caldeirada de Bacalhau MSC Continente Demolhado Congelado Emb.: 700g",
+    "preco": 4.99
+  },
+  {
+    "produto": "Bacalhau Ultracongelado da Marca Pescanova",
+    "preco": 5.29
+  },
+  {
+    "produto": "Bacalhau da Marca Riberalves",
+    "preco": 4.99
+  },
+  {
+    "produto": "Dourada Nacional 200-600g Fresca",
+    "preco": 9.99
+  },
+  {
+    "produto": "Linguado da Guiné Fresco",
+    "preco": 7.49
+  },
+  {
+    "produto": "Tamboril Fresco",
+    "preco": 11.99
+  },
+  {
+    "produto": "Espetadas de Pota e Salmão Frescas",
+    "preco": 17.99
+  },
+  {
+    "produto": "Porção de Salmão Fresco Emb.: 150g",
+    "preco": 2.99
+  },
+  {
+    "produto": "Salmão Inteiro Pequeno 1-3kg Fresco",
+    "preco": 8.99
+  },
+  {
+    "produto": "Carapau Pequeno Fresco",
+    "preco": 3.99
+  },
+  {
+    "produto": "Tentáculos de Polvo Continente Cozido Emb.: 250g",
+    "preco": 10.49
+  },
+  {
+    "produto": "Ovas de Bacalhau Continente Cozidas Emb.: 250g",
+    "preco": 6.99
+  },
+  {
+    "produto": "Bife de Atum Continente Fresco Emb.: 200g",
+    "preco": 4.49
+  },
+  {
+    "produto": "Posta de Bacalhau Congelado (Balcão de Atendimento)",
+    "preco": 7.99
+  },
+  {
+    "produto": "Choco Congelado (Balcão de Atendimento)",
+    "preco": 5.99
+  },
+  {
+    "produto": "Tiras de Choco Panadas Continente Emb.: 300g",
+    "preco": 6.99
+  },
+  {
+    "produto": "Lula da Patagónia Congelada (Balcão de Atendimento)",
+    "preco": 8.99
+  },
+  {
+    "produto": "Lulas Congeladas Média Emb.: 1kg",
+    "preco": 5.99
+  },
+  {
+    "produto": "Solha Grande Congelada (Balcão de Atendimento)",
+    "preco": 9.99
+  },
+  {
+    "produto": "Lombos de Pescada MSC Continente Ultracongelado Emb.: 400g",
+    "preco": 4.09
+  },
+  {
+    "produto": "Filetes de Garoupa Continente Congelado Emb.: 500g",
+    "preco": 5.99
+  },
+  {
+    "produto": "Postas de Maruca Continente Congeladas Emb.: 600g",
+    "preco": 6.99
+  },
+  {
+    "produto": "Caldeirada de Peixe Continente Congelada Emb.: 850g",
+    "preco": 4.99
+  },
+  {
+    "produto": "Filetes de Red Fish Congelados Emb.: 500g",
+    "preco": 5.99
+  },
+  {
+    "produto": "Postas de Raia Congeladas Emb.: 700g",
+    "preco": 7.99
+  },
+  {
+    "produto": "Posta de Tamboril do Cabo Congelada Emb.: 500g",
+    "preco": 11.99
+  },
+  {
+    "produto": "Sardinha Inteira Nacional Continente Congelada Emb.: 1kg",
+    "preco": 5.99
+  },
+  {
+    "produto": "Filetes de Pescada Congelados Emb.: 1kg",
+    "preco": 6.99
+  },
+  {
+    "produto": "Postas de Salmão ASC Congelado Emb.: 700g",
+    "preco": 7.99
+  },
+  {
+    "produto": "Filetes de Dourada/Robalo ASC Iglo Ultracongelado Emb.: 200g",
+    "preco": 6.99
+  },
+  {
+    "produto": "Carapau Pelim Congelado Emb.: 1kg",
+    "preco": 4.99
+  },
+  {
+    "produto": "Caracol Branco Cozido Fresco",
+    "preco": 4.99
+  },
+  {
+    "produto": "Recheio de Sapateira Fresco",
+    "preco": 4.99
+  },
+  {
+    "produto": "Caracol Real Mestre João Fresco Emb.: 600g",
+    "preco": 6.99
+  },
+  {
+    "produto": "Camarão Cozido 30/50 Continente Emb.: 600g+100g",
+    "preco": 8.88
+  }
+]

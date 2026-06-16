@@ -28,8 +28,12 @@ import org.springframework.web.multipart.MultipartFile;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
+    @Autowired
+    private DriveService driveService;
+
     private final AdminService adminService;
     private final SyncService syncService;
+
 
     public AdminController(AdminService adminService, SyncService syncService) {
         this.adminService = adminService;
@@ -55,15 +59,42 @@ public class AdminController {
      * POST /api/v1/admin/upload-to-drive — passo 1 do pipeline novo: guarda o
      * PDF no Google Drive (em memória) e devolve { drive_file_id, filename }.
      */
-    @PostMapping(value = "/upload-to-drive", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<AdminUploadToDriveResponse> uploadToDrive(
-            @RequestParam("supermarket_slug") String supermarketSlug,
-            @RequestParam("valid_from") String validFrom,
-            @RequestParam("valid_until") String validUntil,
-            @RequestPart("file") MultipartFile file) {
-        return ResponseEntity.ok(
-                adminService.uploadToDrive(supermarketSlug, validFrom, validUntil, file));
+    @PostMapping("/upload-flyer")
+    public ResponseEntity<?> uploadFlyer(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("supermarket") String supermarket,
+            @RequestParam("userEmail") String userEmail) {
+
+        // Verifica se é ADMIN
+        if (!"rubensousa106@gmail.com".equals(userEmail)) {
+            return ResponseEntity.status(403).body("Apenas ADMIN pode fazer upload");
+        }
+
+        try {
+            // Guarda temporariamente
+            Path tempFile = Files.createTempFile("flyer_", ".pdf");
+            file.transferTo(tempFile.toFile());
+
+            // Faz upload para o Google Drive
+            String fileId = driveService.uploadFile(
+                    tempFile.toString(),
+                    "1SiJOZVTNxcfk4x6GEFoCtc7CS_sJVpDf" // Folder ID
+            );
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "fileId", fileId,
+                    "message", "Upload realizado com sucesso"
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
     }
+}
 
     /**
      * POST /api/v1/admin/process-flyer — passo 2 (SÍNCRONO, ~1-2 min):
