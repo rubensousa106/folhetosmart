@@ -1,24 +1,31 @@
 package com.folhetosmart.features.sync
 
+import com.folhetosmart.data.api.SupermarketStatusDto
+
 /**
- * Estados do ecrã Sincronizar para o USER (leitura instantânea de dados já
- * processados). NÃO há polling nem progresso por supermercado — isso é só do
- * ecrã Admin. Um único GET, com tempo-limite de 15s.
+ * Estado do ecrã Sincronizar. A lista de supermercados está SEMPRE visível
+ * (USER e ADMIN); é um único GET de leitura ao estado, sem polling contínuo.
  */
 sealed interface SyncUiState {
 
+    /** Primeira leitura (ainda nada para mostrar). */
     data object Loading : SyncUiState
 
-    /** Resumo da semana. Se [hasData] for false mostra a mensagem de espera. */
-    data class Ready(
+    /**
+     * Lista de supermercados + estado. [checking] mostra a barra de
+     * verificação no topo; [errorMessage] é um aviso transitório (ex.: timeout)
+     * que NÃO faz a lista desaparecer.
+     */
+    data class Content(
+        val supermarkets: List<SupermarketStatusDto>,
         val hasData: Boolean,
-        val totalProducts: Int,
-        val supermarketsWithData: Int,
-        val lastUpdateIso: String?,      // formatado no ecrã
-        val validityLabel: String,       // ex.: "12/06 a 18/06/2026"
+        val validityLabel: String,         // "12/06 a 18/06/2026"
+        val lastCheckedLabel: String?,     // "14:32"
+        val checking: Boolean = false,
+        val errorMessage: String? = null,
         val offline: Boolean = false
     ) : SyncUiState
 
-    /** Erro/tempo-limite com botão "Tentar novamente". */
+    /** Falha na primeira leitura sem nada em cache para mostrar. */
     data class Error(val message: String) : SyncUiState
 }

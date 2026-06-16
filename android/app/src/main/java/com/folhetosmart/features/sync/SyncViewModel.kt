@@ -9,7 +9,6 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
 import com.folhetosmart.data.api.SyncStatusDto
 import com.folhetosmart.data.repository.SyncRepository
-import com.folhetosmart.data.repository.WeekRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,80 +18,65 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
 
 /**
- * Ecrã Sincronizar do USER (a maioria dos utilizadores). Lê dados JÁ
- * processados (`GET /api/v1/sync/status`) num único pedido instantâneo — sem
- * polling, sem barra de supermercados, com tempo-limite de 15s. Em paralelo
- * guarda os produtos da semana na cache Room para o Comparar.
- *
- * O processamento pesado (Claude API) e o respetivo progresso vivem APENAS no
- * ecrã Admin (AdminViewModel).
+ * Ecrã Sincronizar (USER e ADMIN). A lista de supermercados está sempre
+ * visível. "Verificar agora" é um único GET de leitura a `/api/v1/sync/status`
+ * (sem polling, sem processamento) com tempo-limite de 30s. O ADMIN tem, por
+ * baixo, uma área de administração para upload de folhetos.
  */
 class SyncViewModel(
-    private val repository: SyncRepository,
-    private val weekRepository: WeekRepository
+    private val repository: SyncRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SyncUiState>(SyncUiState.Loading)
     val uiState: StateFlow<SyncUiState> = _uiState.asStateFlow()
 
     init {
-        // Carga automática: respeita a cache de 1h dos produtos.
-        refresh(manual = false)
+        verify()
     }
 
-    /** Botão "Atualizar"/"Verificar agora" — força a atualização. */
-    fun refresh() = refresh(manual = true)
-
-    /** Um GET ao estado (com tempo-limite de 15s) + cache dos produtos. */
-    private fun refresh(manual: Boolean) {
+    /** Botão "Verificar agora" — lê o estado da BD (30s máx). NÃO processa nada. */
+    fun verify() {
         viewModelScope.launch {
-            if (_uiState.value !is SyncUiState.Ready) _uiState.value = SyncUiState.Loading
+            // A lista nunca desaparece: se já há conteúdo, mostra a barra no topo.
+            (_uiState.value as? SyncUiState.Content)?.let {
+                _uiState.value = it.copy(checking = true, errorMessage = null)
+            }
             try {
-                val (status, fromCache) = withTimeout(REQUEST_TIMEOUT_MS) { repository.status() }
-                _uiState.value = toReady(status, fromCache)
-                prefetchWeek(force = manual)   // produtos para o Comparar
+                val (status, fromCache) = withTimeout(TIMEOUT_MS) { repository.status() }
+                _uiState.value = toContent(status, fromCache)
             } catch (e: TimeoutCancellationException) {
-                _uiState.value = SyncUiState.Error(
-                    "⚠️ Sem resposta do servidor. Verifica a tua ligação."
-                )
+                onCheckFailure("⚠️ Sem resposta. Verifica a tua ligação e tenta novamente.")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _uiState.value = SyncUiState.Error(
-                    "⚠️ Sem resposta do servidor. Verifica a tua ligação."
-                )
+                onCheckFailure("⚠️ Sem resposta. Verifica a tua ligação e tenta novamente.")
             }
         }
     }
 
-    private fun toReady(status: SyncStatusDto, fromCache: Boolean): SyncUiState.Ready {
-        val withData = status.supermarkets.count { it.productsImported > 0 }
-        return SyncUiState.Ready(
+    private fun onCheckFailure(message: String) {
+        _uiState.value = when (val s = _uiState.value) {
+            // Mantém a lista visível; mostra só o aviso.
+            is SyncUiState.Content -> s.copy(checking = false, errorMessage = message)
+            else -> SyncUiState.Error(message)
+        }
+    }
+
+    private fun toContent(status: SyncStatusDto, fromCache: Boolean): SyncUiState.Content =
+        SyncUiState.Content(
+            supermarkets = status.supermarkets,
             hasData = status.hasCurrentWeekData || status.totalProductsThisWeek > 0,
-            totalProducts = status.totalProductsThisWeek,
-            supermarketsWithData = withData,
-            lastUpdateIso = status.lastSync?.finishedAt,
             validityLabel = currentWeekValidity(),
+            lastCheckedLabel = LocalTime.now().format(HHMM),
+            checking = false,
+            errorMessage = null,
             offline = fromCache
         )
-    }
-
-    /** Pré-carrega os produtos da semana na cache Room (best-effort). */
-    private fun prefetchWeek(force: Boolean) {
-        viewModelScope.launch {
-            try {
-                weekRepository.syncWeekProducts(force = force)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // best-effort: o Comparar recarrega na mesma
-            }
-        }
-    }
 
     private fun currentWeekValidity(): String {
         val monday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
@@ -101,14 +85,15 @@ class SyncViewModel(
     }
 
     companion object {
-        private const val REQUEST_TIMEOUT_MS = 15_000L   // USER: leitura < 3s; corta aos 15s
+        private const val TIMEOUT_MS = 30_000L   // USER: leitura < 3s; corta aos 30s
+        private val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         private val DM: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM")
         private val DMY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as FolhetoSmartApp
-                SyncViewModel(app.container.syncRepository, app.container.weekRepository)
+                SyncViewModel(app.container.syncRepository)
             }
         }
     }

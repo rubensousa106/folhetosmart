@@ -100,16 +100,9 @@ fun FolhetoSmartRoot(isAdmin: Boolean = false, onLogout: () -> Unit = {}) {
             composable(Destination.Compare.route) { CompareScreen() }
             composable(Destination.ShoppingList.route) { ListScreen() }
             composable(Destination.Sync.route) {
-                SyncScreen(onSyncSuccess = {
-                    // Após sincronizar, leva o utilizador às promoções no Comparar.
-                    navController.navigate(Destination.Compare.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                })
+                // A lista de supermercados está sempre visível; o ADMIN tem a
+                // área de upload no fundo (bottom sheet).
+                SyncScreen(isAdmin = isAdmin)
             }
             composable(Destination.Alerts.route) { AlertsScreen() }
             composable(Destination.Settings.route) {
