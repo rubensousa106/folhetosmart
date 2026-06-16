@@ -4,7 +4,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,7 +20,6 @@ import com.folhetosmart.sync.dto.AdminFlyersStatusResponse;
 import com.folhetosmart.sync.dto.AdminProcessFlyerRequest;
 import com.folhetosmart.sync.dto.AdminProcessFlyerResponse;
 import com.folhetosmart.sync.dto.AdminUploadResponse;
-import com.folhetosmart.sync.dto.AdminUploadToDriveResponse;
 import com.folhetosmart.sync.dto.SyncTriggerResponse;
 
 /**
@@ -33,9 +31,6 @@ import com.folhetosmart.sync.dto.SyncTriggerResponse;
 @RequestMapping("/api/v1/admin")
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
-
-    @Autowired
-    private DriveService driveService;
 
     private final AdminService adminService;
     private final SyncService syncService;
@@ -58,45 +53,6 @@ public class AdminController {
             @RequestPart("file") MultipartFile file) {
         return ResponseEntity.accepted()
                 .body(adminService.uploadFlyer(supermarketSlug, validFrom, validUntil, file));
-    }
-
-    /**
-     * POST /api/v1/admin/upload-to-drive — upload de um PDF para o Drive
-     */
-    @PostMapping("/upload-to-drive")
-    public ResponseEntity<?> uploadToDrive(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("supermarket") String supermarket,
-            @RequestParam("userEmail") String userEmail) {
-
-        // Verifica se é ADMIN
-        if (!"rubensousa106@gmail.com".equals(userEmail)) {
-            return ResponseEntity.status(403).body("Apenas ADMIN pode fazer upload");
-        }
-
-        try {
-            // Guarda temporariamente
-            Path tempFile = Files.createTempFile("flyer_", ".pdf");
-            file.transferTo(tempFile.toFile());
-
-            // Faz upload para o Google Drive
-            String fileId = driveService.uploadFile(
-                    tempFile.toString(),
-                    "1SiJOZVTNxcfk4x6GEFoCtc7CS_sJVpDf" // Folder ID
-            );
-
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "fileId", fileId,
-                    "message", "Upload realizado com sucesso"
-            ));
-
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of(
-                    "success", false,
-                    "error", e.getMessage()
-            ));
-        }
     }
 
     /**
