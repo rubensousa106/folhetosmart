@@ -32,7 +32,9 @@ class Settings:
     # Google Drive — salvaguarda de folhetos PDF. Credenciais via JSON inline
     # OU caminho para o ficheiro da service account.
     gdrive_credentials_json: str = os.getenv("GOOGLE_DRIVE_CREDENTIALS_JSON", "")
-    gdrive_credentials_path: str = os.getenv("GOOGLE_DRIVE_CREDENTIALS_PATH", "")
+    gdrive_credentials_path: str = os.getenv(
+        "GOOGLE_DRIVE_CREDENTIALS_PATH", "credentials/gdrive_credentials.json"
+    )
     gdrive_folder_id: str = os.getenv("GOOGLE_DRIVE_FOLDER_ID", "")
     # Firebase Cloud Messaging (avisar o admin de folhetos em falta).
     fcm_credentials_json: str = os.getenv("FCM_CREDENTIALS_JSON", "")
