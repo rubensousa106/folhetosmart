@@ -1,4 +1,4 @@
-# pdf_extractor.py - VERSÃO COMPLETA CORRIGIDA (SEM IMPORT CIRCULAR)
+# scraper/pdf_extractor.py - VERSÃO COMPLETA UNIFICADA
 import os
 import json
 import logging
@@ -264,3 +264,119 @@ def extract_products_from_pdf(pdf_path, supermarket=None):
     """Extrai produtos do PDF usando IA (página a página)"""
     extractor = PDFExtractor()
     return extractor.extract_structured_data_por_paginas(pdf_path, supermarket)
+
+
+# ============================================================
+# FUNÇÕES OCR PARA EXTRAÇÃO DE BLOCOS DE IMAGEM
+# ============================================================
+def extract_blocks_from_image(image_path):
+    """
+    Extrai blocos de texto de uma imagem usando OCR.
+
+    Args:
+        image_path: Caminho da imagem (ou objeto PIL Image)
+
+    Returns:
+        list: Lista de blocos com texto e coordenadas
+    """
+    try:
+        import pytesseract
+        from PIL import Image
+    except ImportError:
+        logging.error("pytesseract ou PIL não instalados")
+        return []
+
+    if isinstance(image_path, str):
+        image = Image.open(image_path)
+    else:
+        image = image_path
+
+    custom_config = r'--oem 3 --psm 6 -l por'
+    data = pytesseract.image_to_data(image, config=custom_config, output_type=pytesseract.Output.DICT)
+
+    blocks = []
+    n_boxes = len(data['level'])
+
+    for i in range(n_boxes):
+        if data['text'][i].strip() and int(data['conf'][i]) > 30:
+            blocks.append({
+                'text': data['text'][i],
+                'left': data['left'][i],
+                'top': data['top'][i],
+                'width': data['width'][i],
+                'height': data['height'][i],
+                'conf': data['conf'][i]
+            })
+
+    return blocks
+
+def extract_blocks_from_images(image_paths):
+    """
+    Extrai blocos de texto de múltiplas imagens.
+    """
+    all_blocks = []
+    for image_path in image_paths:
+        blocks = extract_blocks_from_image(image_path)
+        all_blocks.extend(blocks)
+    return all_blocks
+
+def extract_blocks_from_pdf(pdf_path, dpi=300):
+    """
+    Extrai blocos de texto de todas as páginas de um PDF.
+    """
+    try:
+        from pdf2image import convert_from_path
+    except ImportError:
+        logging.error("pdf2image não instalado")
+        return []
+
+    try:
+        images = convert_from_path(pdf_path, dpi=dpi)
+        all_blocks = []
+        for i, image in enumerate(images):
+            blocks = extract_blocks_from_image(image)
+            for block in blocks:
+                block['page'] = i + 1
+            all_blocks.extend(blocks)
+        return all_blocks
+    except Exception as e:
+        logging.error(f"Erro ao processar PDF: {e}")
+        return []
+
+def extract_text_from_image(image_path):
+    """
+    Extrai texto simples de uma imagem.
+    """
+    blocks = extract_blocks_from_image(image_path)
+    return "\n".join([block['text'] for block in blocks])
+
+def extract_text_from_images(image_paths):
+    """
+    Extrai texto de múltiplas imagens.
+    """
+    all_text = []
+    for image_path in image_paths:
+        text = extract_text_from_image(image_path)
+        all_text.append(text)
+    return "\n".join(all_text)
+
+def extract_text_from_pdf(pdf_path, dpi=300):
+    """
+    Extrai texto de todas as páginas de um PDF.
+    """
+    try:
+        from pdf2image import convert_from_path
+    except ImportError:
+        logging.error("pdf2image não instalado")
+        return ""
+
+    try:
+        images = convert_from_path(pdf_path, dpi=dpi)
+        all_text = []
+        for i, image in enumerate(images):
+            text = extract_text_from_image(image)
+            all_text.append(f"--- PÁGINA {i+1} ---\n{text}")
+        return "\n".join(all_text)
+    except Exception as e:
+        logging.error(f"Erro ao processar PDF: {e}")
+        return ""
