@@ -5,6 +5,8 @@ import com.folhetosmart.prices.dto.PriceHistoryPointDto;
 import com.folhetosmart.prices.dto.ProductPriceDto;
 import com.folhetosmart.products.dto.ProductDto;
 import org.springframework.data.domain.Page;
+import com.folhetosmart.sync.DriveService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,6 +24,9 @@ public class ProductController {
 
     private final ProductService productService;
     private final PriceService priceService;
+
+    @Autowired
+    private DriveService driveService;
 
     public ProductController(ProductService productService, PriceService priceService) {
         this.productService = productService;
@@ -61,5 +66,24 @@ public class ProductController {
     public ResponseEntity<List<PriceHistoryPointDto>> priceHistory(@PathVariable UUID id) {
         productService.getEntity(id);
         return ResponseEntity.ok(priceService.priceHistory(id));
+    }
+    /** GET /api/v1/products/latest?supermarket=Continente
+     * Devolve o JSON mais recente de um supermercado (lido do Google Drive).
+     **/
+    @GetMapping("/latest")
+    public ResponseEntity<String> getLatestProducts(@RequestParam String supermarket) {
+        try {
+            // Lê o JSON mais recente do Drive
+            String json = driveService.getLatestJson(supermarket);
+
+            if (json == null || json.isEmpty()) {
+                return ResponseEntity.status(404).body("{\"error\": \"Sem produtos disponíveis para " + supermarket + "\"}");
+            }
+
+            return ResponseEntity.ok(json);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
     }
 }

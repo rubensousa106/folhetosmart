@@ -51,6 +51,7 @@ class DriveUploader:
             return {"error": f"Ficheiro não encontrado: {json_path}"}
 
         file_name = os.path.basename(json_path)
+        file_metadata = {'name': file_name, 'parents': [self.folder_id]}
 
         file_metadata = {
             'name': file_name,
