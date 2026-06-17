@@ -78,4 +78,13 @@ object ApiClient {
             .build()
             .create(ApiService::class.java)
     }
+
+    /**
+     * GET /api/v1/products/latest?supermarket=Continente
+     * Devolve o JSON mais recente de um supermercado (lido do Google Drive).
+     */
+    @GET("api/v1/products/latest")
+    suspend fun getLatestProducts(
+        @Query("supermarket") supermarket: String
+    ): Response<String>
 }
