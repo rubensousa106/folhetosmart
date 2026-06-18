@@ -53,6 +53,14 @@ interface ApiService {
     @GET("api/v1/products/{id}/prices")
     suspend fun productPrices(@Path("id") productId: String): List<ProductPriceDto>
 
+    // ============================================================
+    // 🆕 NOVO - GET /api/v1/products/latest
+    // ============================================================
+    @GET("api/v1/products/latest")
+    suspend fun getLatestProducts(
+        @Query("supermarket") supermarket: String
+    ): SupermarketResponse
+
     // --- Comparação ---
     @POST("api/v1/compare")
     suspend fun compare(@Body request: CompareRequest): List<CompareResultDto>

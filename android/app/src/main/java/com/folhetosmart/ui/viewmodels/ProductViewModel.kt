@@ -4,8 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.folhetosmart.data.api.ApiService
 import com.folhetosmart.data.models.Product
-import com.folhetosmart.data.models.SupermarketResponse
-import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,17 +30,14 @@ class ProductViewModel(
             try {
                 val response = apiService.getLatestProducts(supermarket)
                 if (response.isSuccessful) {
-                    val json = response.body()
-                    if (json != null) {
-                        // Parse JSON
-                        val gson = Gson()
-                        val data = gson.fromJson(json, SupermarketResponse::class.java)
-                        _products.value = data.produtos
+                    val data = response.body()
+                    if (data != null) {
+                        _products.value = data.produtos  // ✅ Agora funciona
                     } else {
                         _error.value = "Sem dados disponíveis"
                     }
                 } else {
-                    _error.value = "Erro ao carregar dados"
+                    _error.value = "Erro ao carregar dados: ${response.code()}"
                 }
             } catch (e: Exception) {
                 _error.value = e.message
