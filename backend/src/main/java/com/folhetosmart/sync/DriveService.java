@@ -1,12 +1,5 @@
 package com.folhetosmart.sync;
 
-import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.gson.GsonFactory;
-import com.google.api.services.drive.Drive;
-import com.google.api.services.drive.DriveScopes;
-import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.GoogleCredentials;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -14,9 +7,10 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.security.GeneralSecurityException;
-import java.util.Collections;
-import java.util.List;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 
 @Service
 public class DriveService {
@@ -24,73 +18,53 @@ public class DriveService {
     @Value("${GOOGLE_DRIVE_CREDENTIALS_PATH:credentials/gdrive_credentials.json}")
     private String credentialsPath;
 
-    @Value("${{GOOGLE_DRIVE_FOLDER_ID:1SiJOZVTNxcfk4x6GEFoCtc7CS_sJVpDf}")
+    @Value("${GOOGLE_DRIVE_FOLDER_ID:1SiJOZVTNxcfk4x6GEFoCtc7CS_sJVpDf}")
     private String folderId;
 
-    private Drive driveService;
+    private String accessToken;
 
-    private Drive getDriveService() throws GeneralSecurityException, IOException {
-        if (driveService == null) {
-            JsonFactory jsonFactory = GsonFactory.getDefaultInstance();
-            NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
-
-            GoogleCredentials credentials;
+    private String getAccessToken() throws IOException {
+        if (accessToken == null) {
             try (FileInputStream serviceAccountStream = new FileInputStream(credentialsPath)) {
-                credentials = GoogleCredentials.fromStream(serviceAccountStream)
-                        .createScoped(Collections.singleton(DriveScopes.DRIVE_READONLY));
+                GoogleCredentials credentials = GoogleCredentials.fromStream(serviceAccountStream)
+                        .createScoped(java.util.Arrays.asList("https://www.googleapis.com/auth/drive.readonly"));
+                credentials.refreshIfExpired();
+                accessToken = credentials.getAccessToken().getTokenValue();
             }
-
-            driveService = new Drive.Builder(httpTransport, jsonFactory, new HttpCredentialsAdapter(credentials))
-                    .setApplicationName("FolhetoSmart")
-                    .build();
         }
-        return driveService;
+        return accessToken;
     }
 
     /**
      * Obtém o JSON mais recente de um supermercado do Google Drive.
-     *
-     * @param supermarket Nome do supermercado (ex: "Continente")
-     * @return Conteúdo do JSON como String, ou null se não existir
      */
     public String getLatestJson(String supermarket) {
         try {
-            Drive drive = getDriveService();
-
-            // Procura JSONs com o nome do supermercado
-            String query = String.format(
-                    "'%s' in parents and mimeType='application/json' and name contains '%s'",
+            // 1. Lista os ficheiros na pasta
+            String listUrl = String.format(
+                    "https://www.googleapis.com/drive/v3/files?q='%s' in parents and mimeType='application/json' and name contains '%s'&orderBy=modifiedTime desc&pageSize=1&fields=files(id,name)",
                     folderId, supermarket
             );
 
-            Drive.Files.List request = drive.files().list()
-                    .setQ(query)
-                    .setFields("files(id, name, createdTime, modifiedTime)")
-                    .setOrderBy("modifiedTime desc")
-                    .setPageSize(1);
+            String listResponse = sendGetRequest(listUrl);
+            System.out.println("📄 Lista de ficheiros: " + listResponse);
 
-            com.google.api.services.drive.model.FileList result = request.execute();
-            List<com.google.api.services.drive.model.File> files = result.getFiles();
-
-            if (files == null || files.isEmpty()) {
+            // 2. Extrai o ID do ficheiro
+            String fileId = extractFileId(listResponse);
+            if (fileId == null) {
                 System.out.println("⚠️ Nenhum JSON encontrado para: " + supermarket);
                 return null;
             }
 
-            // Pega o ficheiro mais recente
-            com.google.api.services.drive.model.File file = files.get(0);
-            String fileId = file.getId();
+            // 3. Descarrega o ficheiro
+            String downloadUrl = String.format(
+                    "https://www.googleapis.com/drive/v3/files/%s?alt=media",
+                    fileId
+            );
 
-            System.out.println("📄 A ler JSON: " + file.getName() + " (ID: " + fileId + ")");
-
-            // Lê o conteúdo do JSON
-            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-                drive.files().get(fileId)
-                        .executeMediaAndDownloadTo(outputStream);
-                String json = outputStream.toString(java.nio.charset.StandardCharsets.UTF_8);
-                System.out.println("✅ JSON lido com sucesso! Tamanho: " + json.length() + " caracteres");
-                return json;
-            }
+            String json = sendGetRequest(downloadUrl);
+            System.out.println("✅ JSON lido com sucesso! Tamanho: " + json.length() + " caracteres");
+            return json;
 
         } catch (Exception e) {
             System.err.println("❌ Erro ao ler JSON do Drive: " + e.getMessage());
@@ -99,29 +73,33 @@ public class DriveService {
         }
     }
 
-    /**
-     * Lista todos os JSONs disponíveis no Drive.
-     */
-    public List<com.google.api.services.drive.model.File> listAllJsons() {
-        try {
-            Drive drive = getDriveService();
+    private String sendGetRequest(String urlString) throws IOException {
+        URL url = new URL(urlString);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setRequestProperty("Authorization", "Bearer " + getAccessToken());
 
-            String query = String.format(
-                    "'%s' in parents and mimeType='application/json'",
-                    folderId
-            );
-
-            Drive.Files.List request = drive.files().list()
-                    .setQ(query)
-                    .setFields("files(id, name, createdTime, modifiedTime)")
-                    .setOrderBy("modifiedTime desc");
-
-            com.google.api.services.drive.model.FileList result = request.execute();
-            return result.getFiles();
-
-        } catch (Exception e) {
-            System.err.println("❌ Erro ao listar JSONs: " + e.getMessage());
-            return Collections.emptyList();
+        if (conn.getResponseCode() != 200) {
+            throw new IOException("HTTP error: " + conn.getResponseCode() + " - " + conn.getResponseMessage());
         }
+
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream();
+             java.io.InputStream in = conn.getInputStream()) {
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = in.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+            }
+            return out.toString(StandardCharsets.UTF_8);
+        }
+    }
+
+    private String extractFileId(String jsonResponse) {
+        // Procura por "id":"..." no JSON
+        int start = jsonResponse.indexOf("\"id\":\"");
+        if (start == -1) return null;
+        start += 6;
+        int end = jsonResponse.indexOf("\"", start);
+        return jsonResponse.substring(start, end);
     }
 }
