@@ -57,7 +57,7 @@ interface ApiService {
     // ============================================================
     // 🆕 NOVO - GET /api/v1/products/latest
     // ============================================================
-   
+
     @GET("api/v1/products/latest")
     suspend fun getLatestProducts(
         @Query("supermarket") supermarket: String
