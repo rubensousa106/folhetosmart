@@ -7,7 +7,5 @@ data class Product(
 
 data class SupermarketResponse(
     val supermercado: String,
-    val data_extracao: String,
-    val total_produtos: Int,
     val produtos: List<Product>
 )

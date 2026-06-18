@@ -1,5 +1,6 @@
 package com.folhetosmart.data.api
 
+import com.folhetosmart.data.models.SupermarketResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
@@ -56,10 +57,11 @@ interface ApiService {
     // ============================================================
     // 🆕 NOVO - GET /api/v1/products/latest
     // ============================================================
+   
     @GET("api/v1/products/latest")
     suspend fun getLatestProducts(
         @Query("supermarket") supermarket: String
-    ): SupermarketResponse
+    ): retrofit2.Response<SupermarketResponse>
 
     // --- Comparação ---
     @POST("api/v1/compare")

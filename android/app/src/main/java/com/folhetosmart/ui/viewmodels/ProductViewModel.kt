@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.folhetosmart.data.api.ApiService
 import com.folhetosmart.data.models.Product
+import com.folhetosmart.data.models.SupermarketResponse
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import retrofit2.Response
 
 class ProductViewModel(
     private val apiService: ApiService
@@ -28,11 +30,11 @@ class ProductViewModel(
             _error.value = null
 
             try {
-                val response = apiService.getLatestProducts(supermarket)
+                val response: Response<SupermarketResponse> = apiService.getLatestProducts(supermarket)
                 if (response.isSuccessful) {
                     val data = response.body()
                     if (data != null) {
-                        _products.value = data.produtos  // ✅ Agora funciona
+                        _products.value = data.produtos
                     } else {
                         _error.value = "Sem dados disponíveis"
                     }
