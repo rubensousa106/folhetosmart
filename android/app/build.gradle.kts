@@ -10,17 +10,15 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        // ID de publicação na Play Store (o namespace Kotlin mantém-se com.folhetosmart).
         applicationId = "pt.folhetosmart.app"
-        minSdk = 26          // Android 8.0 — cobre ~95% dos dispositivos PT
-        targetSdk = 35       // Play Store exige >= 35 para apps novas (desde 31/08/2025)
+        minSdk = 26
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // App Bundle: splits por idioma/densidade/ABI reduzem o download na Play Store.
     bundle {
         language { enableSplit = true }
         density { enableSplit = true }
@@ -29,12 +27,14 @@ android {
 
     buildTypes {
         debug {
-            // Emulador -> localhost da máquina host.
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080/\"")
+            // Lê do gradle.properties (ou usa fallback)
+            val apiUrl: String = project.findProperty("API_BASE_URL") as? String ?: "https://folhetosmart.onrender.com/"
+            buildConfigField("String", "API_BASE_URL", "\"$apiUrl\"")
         }
         release {
-            // Produção -> backend no Hetzner (HTTPS).
-            buildConfigField("String", "API_BASE_URL", "\"https://api.folhetosmart.pt/\"")
+            // Lê do gradle.properties (ou usa fallback)
+            val apiUrl: String = project.findProperty("API_BASE_URL") as? String ?: "https://folhetosmart.onrender.com/"
+            buildConfigField("String", "API_BASE_URL", "\"$apiUrl\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

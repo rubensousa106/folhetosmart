@@ -43,3 +43,9 @@ scraper/tmp/
 scraper/folhetos/
 scraper/credentials/
 *.log
+
+
+# Gradle local properties (contém URLs e chaves)
+gradle.properties
+local.properties
+*.properties
