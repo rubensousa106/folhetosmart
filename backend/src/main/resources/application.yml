@@ -64,6 +64,23 @@ folheto:
     # o processamento semanal corre no GitHub Actions. Local/docker: true.
     enabled: ${FOLHETO_SCHEDULER_ENABLED:true}
 
+# ============================================================
+# ACTUATOR - Health Check para o Render
+# ============================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+
+# ============================================================
+# LOGGING - Mais detalhes para diagnóstico
+# ============================================================
 logging:
   level:
-    pt.folhetosmart: INFO
+    pt.folhetosmart: DEBUG
+    org.springframework.boot: INFO
+    org.springframework.web: DEBUG
