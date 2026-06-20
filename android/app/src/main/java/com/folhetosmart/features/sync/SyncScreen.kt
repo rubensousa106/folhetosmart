@@ -14,9 +14,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -55,7 +54,6 @@ import com.folhetosmart.ui.components.Formatters
 import com.folhetosmart.ui.components.LoadingView
 import com.folhetosmart.ui.theme.ErrorRed
 import com.folhetosmart.ui.theme.FolhetoSmartGreen
-import com.folhetosmart.ui.theme.WaitingGrey
 
 /**
  * Ecrã "Sincronizar" — a lista de supermercados está SEMPRE visível (USER e
@@ -218,20 +216,18 @@ private fun SupermarketRow(m: SupermarketStatusDto) {
     ) {
         when {
             m.syncStatus == "running" -> Icon(
-                Icons.Filled.Sync, contentDescription = "A processar",
-                tint = FolhetoSmartGreen, modifier = Modifier.size(22.dp)
-            )
-            m.syncStatus == "error" -> Icon(
-                Icons.Filled.ErrorOutline, contentDescription = "Falhou",
-                tint = ErrorRed, modifier = Modifier.size(22.dp)
+                Icons.Filled.Sync, contentDescription = "A sincronizar",
+                tint = FolhetoSmartGreen, modifier = Modifier.size(24.dp)
             )
             hasData -> Icon(
-                Icons.Filled.CheckCircle, contentDescription = "Com dados",
-                tint = FolhetoSmartGreen, modifier = Modifier.size(22.dp)
+                // ✓ — sincronizado com sucesso
+                Icons.Filled.CheckCircle, contentDescription = "Sincronizado",
+                tint = FolhetoSmartGreen, modifier = Modifier.size(24.dp)
             )
             else -> Icon(
-                Icons.Filled.HourglassEmpty, contentDescription = "Sem dados",
-                tint = WaitingGrey, modifier = Modifier.size(22.dp)
+                // ✗ — ainda sem dados / por sincronizar
+                Icons.Filled.Cancel, contentDescription = "Por sincronizar",
+                tint = ErrorRed, modifier = Modifier.size(24.dp)
             )
         }
 
