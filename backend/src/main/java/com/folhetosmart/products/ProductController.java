@@ -107,8 +107,11 @@ public class ProductController {
                     if (produto == null || produto.isBlank()) {
                         continue;
                     }
+                    // Nome canónico (se já normalizado) para agrupar; senão o original.
+                    String canonico = item.path("canonico").asText(null);
+                    String nome = (canonico != null && !canonico.isBlank()) ? canonico : produto;
                     offerings.add(new FlyerOfferingDto(
-                            produto, item.path("preco").asDouble(0), supermercado, validade));
+                            nome, item.path("preco").asDouble(0), supermercado, validade, produto));
                 }
             } catch (Exception ignored) {
                 // um folheto com payload inválido não trava os outros

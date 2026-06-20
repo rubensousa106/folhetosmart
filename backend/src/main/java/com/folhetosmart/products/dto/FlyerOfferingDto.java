@@ -6,9 +6,10 @@ package com.folhetosmart.products.dto;
  * mais barata (ecrã Comparar).
  */
 public record FlyerOfferingDto(
-        String produto,
+        String produto,      // nome canónico (normalizado) — usado para agrupar
         double preco,
         String supermercado,
-        String validade
+        String validade,
+        String original      // nome tal como aparece no folheto da loja
 ) {
 }

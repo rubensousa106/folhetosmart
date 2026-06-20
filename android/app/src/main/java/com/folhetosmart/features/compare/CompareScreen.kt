@@ -187,6 +187,15 @@ private fun OfferRow(offer: FlyerOfferingDto, highlight: Boolean) {
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (highlight) FontWeight.Bold else FontWeight.Medium
             )
+            // Nome tal como aparece no folheto, quando difere do canónico.
+            offer.original?.takeIf { it.isNotBlank() && it != offer.produto }?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
             offer.validade?.let {
                 Text(
                     "Válido: $it",
