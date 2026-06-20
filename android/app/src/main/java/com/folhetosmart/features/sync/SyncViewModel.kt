@@ -7,9 +7,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
-import com.folhetosmart.data.api.ApiService
-import com.folhetosmart.data.api.SupermarketStatusDto
-import com.folhetosmart.data.api.SyncStatusDto
 import com.folhetosmart.data.models.Product
 import com.folhetosmart.data.repository.SyncRepository
 import kotlinx.coroutines.CancellationException
@@ -28,14 +25,8 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
 
-/**
- * Ecrã Sincronizar (USER e ADMIN). A lista de supermercados está sempre
- * visível. "Verificar agora" é um único GET de leitura a `/api/v1/sync/status`
- * (sem polling, sem processamento) com tempo-limite de 30s.
- */
 class SyncViewModel(
-    private val repository: SyncRepository,
-    private val apiService: ApiService
+    private val repository: SyncRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SyncUiState>(SyncUiState.Loading)
@@ -44,9 +35,6 @@ class SyncViewModel(
     private val _events = MutableSharedFlow<SyncEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<SyncEvent> = _events.asSharedFlow()
 
-    // ============================================================
-    // PRODUTOS POR SUPERMERCADO
-    // ============================================================
     private val _productsMap = MutableStateFlow<Map<String, List<Product>>>(emptyMap())
     val productsMap: StateFlow<Map<String, List<Product>>> = _productsMap.asStateFlow()
 
@@ -82,15 +70,11 @@ class SyncViewModel(
         }
     }
 
-    /**
-     * Descarrega os produtos de um supermercado específico.
-     */
     fun downloadProducts(supermarket: String) {
         viewModelScope.launch {
             _loadingSupermarkets.value = _loadingSupermarkets.value + supermarket
-
             try {
-                val response = apiService.getLatestProducts(supermarket)
+                val response = repository.getLatestProducts(supermarket)
                 if (response.isSuccessful) {
                     val data = response.body()
                     if (data != null && data.produtos.isNotEmpty()) {
@@ -110,12 +94,8 @@ class SyncViewModel(
         }
     }
 
-    /**
-     * Descarrega os produtos de TODOS os supermercados disponíveis.
-     */
     fun downloadAllProducts() {
-        val supermarkets = _supermarketNames.value
-        supermarkets.forEach { supermarket ->
+        _supermarketNames.value.forEach { supermarket ->
             downloadProducts(supermarket)
         }
     }
@@ -133,7 +113,6 @@ class SyncViewModel(
 
     private fun toContent(status: SyncStatusDto, fromCache: Boolean): SyncUiState.Content {
         val supermarketNames = status.supermarkets.map { it.name }
-        // Atualiza a lista de nomes para usar no downloadAllProducts
         _supermarketNames.value = supermarketNames
 
         return SyncUiState.Content(
@@ -155,34 +134,25 @@ class SyncViewModel(
 
     companion object {
         private const val TIMEOUT_MS = 30_000L
-        private val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-        private val DM: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM")
-        private val DMY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+        private val HHMM = DateTimeFormatter.ofPattern("HH:mm")
+        private val DM = DateTimeFormatter.ofPattern("dd/MM")
+        private val DMY = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as FolhetoSmartApp
-                SyncViewModel(
-                    repository = app.container.syncRepository,
-                    apiService = app.container.apiService
-                )
+                SyncViewModel(app.container.syncRepository)
             }
         }
     }
 }
 
-// ============================================================
-// EVENTOS
-// ============================================================
 sealed class SyncEvent {
     data class Checked(val hasData: Boolean) : SyncEvent()
     data class ProductsLoaded(val supermarket: String, val products: List<Product>) : SyncEvent()
     data class Error(val message: String) : SyncEvent()
 }
 
-// ============================================================
-// UI STATE
-// ============================================================
 sealed class SyncUiState {
     data object Loading : SyncUiState()
     data class Error(val message: String) : SyncUiState()
