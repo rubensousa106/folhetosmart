@@ -118,7 +118,7 @@ def _verify_tls() -> bool:
 
 
 def _backend_base() -> str:
-    return os.getenv("FOLHETO_BACKEND_URL", "http://localhost:8080").rstrip("/")
+    return os.getenv("FOLHETO_BACKEND_URL", "https://folhetosmart.onrender.com").rstrip("/")
 
 
 def _backend_token() -> str | None:
