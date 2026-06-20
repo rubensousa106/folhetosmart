@@ -77,4 +77,30 @@ public class AdminController {
     public ResponseEntity<SyncTriggerResponse> trigger() {
         return ResponseEntity.accepted().body(syncService.trigger("admin"));
     }
+
+    /**
+     * POST /api/v1/admin/products?supermarket=Continente&count=557&flyer=...
+     * Corpo = JSON {supermercado, produtos:[...]} produzido pelo scraper. Guarda
+     * o folheto mais recente desse supermercado (a app lê-o em
+     * GET /api/v1/products/latest) e regista o nome do folheto (flag "analisar 1×").
+     */
+    @PostMapping(value = "/products", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Void> uploadProducts(
+            @RequestParam("supermarket") String supermarket,
+            @RequestParam(value = "count", defaultValue = "0") int count,
+            @RequestParam(value = "flyer", required = false) String flyer,
+            @RequestBody String payload) {
+        adminService.saveLatestProducts(supermarket, count, flyer, payload);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * GET /api/v1/admin/products/source?supermarket=Continente
+     * Devolve o nome do folheto já analisado (ou ""). O produtor consulta-o ANTES
+     * de gastar IA: se for o mesmo folheto, não reextrai (flag "analisar 1×").
+     */
+    @GetMapping("/products/source")
+    public ResponseEntity<Map<String, String>> productsSource(@RequestParam("supermarket") String supermarket) {
+        return ResponseEntity.ok(Map.of("flyer", adminService.currentSourceFlyer(supermarket)));
+    }
 }

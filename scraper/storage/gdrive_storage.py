@@ -188,6 +188,37 @@ class GoogleDriveStorage:
             logger.warning("Drive: falha no upload (memória) de %s: %s", filename, exc)
             return None
 
+    def upload_json_file(
+        self, local_path, filename: str, replace: bool = True
+    ) -> Optional[str]:
+        """Faz upload de um ficheiro JSON para o Drive (1 por supermercado/semana).
+
+        É isto que faltava: o produtor gera o JSON {supermercado, produtos} e
+        guarda-o no Drive com a service account; o backend (DriveService) lê-o
+        depois para a app. Substitui o ficheiro com o mesmo nome.
+        """
+        from googleapiclient.http import MediaFileUpload  # lazy
+
+        try:
+            existing = self._find_by_name(filename)
+            media = MediaFileUpload(str(local_path), mimetype="application/json")
+            if existing:
+                if not replace:
+                    logger.info("Drive: %s já existe — não duplica", filename)
+                    return existing
+                self.service.files().update(fileId=existing, media_body=media).execute()
+                logger.info("Drive: JSON %s substituído", filename)
+                return existing
+            meta = {"name": filename, "parents": [self.folder_id]}
+            created = self.service.files().create(
+                body=meta, media_body=media, fields="id"
+            ).execute()
+            logger.info("Drive: JSON %s carregado", filename)
+            return created.get("id")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Drive: falha no upload do JSON %s: %s", filename, exc)
+            return None
+
     def _find_by_name(self, filename: str) -> Optional[str]:
         query = (
             f"'{self.folder_id}' in parents and name='{filename}' "

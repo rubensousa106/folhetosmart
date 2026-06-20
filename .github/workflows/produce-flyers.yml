@@ -1,0 +1,62 @@
+name: Produzir folhetos (Drive -> backend)
+
+# Modelo simples "analisar 1x, ler Nx": descarrega os PDFs da pasta do Drive,
+# extrai os produtos com a Claude (pdf_extractor, pagina-a-pagina) e faz POST do
+# JSON para o backend (Postgres do Render). A app le em /api/v1/products/latest.
+#
+# Corre no GitHub Actions (e nao no Render) porque a extracao precisa de mais
+# RAM/tempo do que o plano gratis do Render oferece. A flag "analisar 1x" e
+# DURAVEL no backend: se o folheto ja foi analisado, o produtor salta (0 EUR).
+
+on:
+  schedule:
+    # Quinta-feira 09:00 UTC (~10:00 em Lisboa). Ajusta se necessario.
+    - cron: "0 9 * * 4"
+  workflow_dispatch:        # disparo manual no GitHub OU via n8n (Drive Trigger)
+    inputs:
+      supermarket:
+        description: "So este supermercado (vazio = todos)"
+        required: false
+        default: ""
+      force:
+        description: "Reextrair mesmo que ja analisado (1 = sim)"
+        required: false
+        default: "0"
+
+# Evita duas execucoes em simultaneo (cron + manual/n8n).
+concurrency:
+  group: produce-flyers
+  cancel-in-progress: false
+
+jobs:
+  produce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Obter o codigo
+        uses: actions/checkout@v4
+
+      - name: Construir a imagem do scraper
+        run: docker build -t folhetosmart-scraper ./scraper
+
+      - name: Produzir (extrai com IA + POST para o backend)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-sonnet-4-6' }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          GOOGLE_DRIVE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS_JSON }}
+          # Backend (Postgres do Render) — destino do POST do produtor.
+          FOLHETO_BACKEND_URL: ${{ vars.FOLHETO_BACKEND_URL || 'https://folhetosmart.onrender.com' }}
+          FOLHETO_ADMIN_EMAIL: ${{ secrets.FOLHETO_ADMIN_EMAIL }}
+          FOLHETO_ADMIN_PASSWORD: ${{ secrets.FOLHETO_ADMIN_PASSWORD }}
+          FOLHETO_FORCE: ${{ inputs.force || '0' }}
+          ALVO: ${{ inputs.supermarket }}
+        run: |
+          docker run --rm \
+            -e ANTHROPIC_API_KEY \
+            -e ANTHROPIC_MODEL \
+            -e GOOGLE_DRIVE_FOLDER_ID -e GOOGLE_DRIVE_CREDENTIALS_JSON \
+            -e FOLHETO_BACKEND_URL -e FOLHETO_ADMIN_EMAIL -e FOLHETO_ADMIN_PASSWORD \
+            -e FOLHETO_FORCE \
+            folhetosmart-scraper \
+            python drive_producer.py ${ALVO}
