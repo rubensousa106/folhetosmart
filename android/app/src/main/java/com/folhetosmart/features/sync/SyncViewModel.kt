@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
 import com.folhetosmart.data.api.ApiService
+import com.folhetosmart.data.api.SupermarketStatusDto
 import com.folhetosmart.data.api.SyncStatusDto
 import com.folhetosmart.data.models.Product
 import com.folhetosmart.data.repository.SyncRepository
@@ -30,10 +31,7 @@ import java.time.temporal.TemporalAdjusters
 /**
  * Ecrã Sincronizar (USER e ADMIN). A lista de supermercados está sempre
  * visível. "Verificar agora" é um único GET de leitura a `/api/v1/sync/status`
- * (sem polling, sem processamento) com tempo-limite de 30s. O ADMIN tem, por
- * baixo, uma área de administração para upload de folhetos.
- *
- * Também suporta o download de produtos para cada supermercado.
+ * (sem polling, sem processamento) com tempo-limite de 30s.
  */
 class SyncViewModel(
     private val repository: SyncRepository,
@@ -43,7 +41,6 @@ class SyncViewModel(
     private val _uiState = MutableStateFlow<SyncUiState>(SyncUiState.Loading)
     val uiState: StateFlow<SyncUiState> = _uiState.asStateFlow()
 
-    // Eventos one-shot (Snackbar de "Verificar agora") — só em verificação manual.
     private val _events = MutableSharedFlow<SyncEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<SyncEvent> = _events.asSharedFlow()
 
@@ -56,17 +53,17 @@ class SyncViewModel(
     private val _loadingSupermarkets = MutableStateFlow<Set<String>>(emptySet())
     val loadingSupermarkets: StateFlow<Set<String>> = _loadingSupermarkets.asStateFlow()
 
+    private val _supermarketNames = MutableStateFlow<List<String>>(emptyList())
+    val supermarketNames: StateFlow<List<String>> = _supermarketNames.asStateFlow()
+
     init {
-        // Carga automática inicial — sem Snackbar.
         verify(manual = false)
     }
 
-    /** Botão "Verificar agora" — lê o estado da BD (30s máx). NÃO processa nada. */
     fun verify() = verify(manual = true)
 
     private fun verify(manual: Boolean) {
         viewModelScope.launch {
-            // A lista nunca desaparece: se já há conteúdo, mostra a barra no topo.
             (_uiState.value as? SyncUiState.Content)?.let {
                 _uiState.value = it.copy(checking = true, errorMessage = null)
             }
@@ -87,11 +84,9 @@ class SyncViewModel(
 
     /**
      * Descarrega os produtos de um supermercado específico.
-     * @param supermarket Nome do supermercado (ex: "Continente", "Pingo Doce", etc.)
      */
     fun downloadProducts(supermarket: String) {
         viewModelScope.launch {
-            // Marca este supermercado como "a carregar"
             _loadingSupermarkets.value = _loadingSupermarkets.value + supermarket
 
             try {
@@ -99,7 +94,6 @@ class SyncViewModel(
                 if (response.isSuccessful) {
                     val data = response.body()
                     if (data != null && data.produtos.isNotEmpty()) {
-                        // Guarda os produtos no mapa
                         _productsMap.value = _productsMap.value + (supermarket to data.produtos)
                         _events.tryEmit(SyncEvent.ProductsLoaded(supermarket, data.produtos))
                     } else {
@@ -111,7 +105,6 @@ class SyncViewModel(
             } catch (e: Exception) {
                 _events.tryEmit(SyncEvent.Error("Erro: ${e.message}"))
             } finally {
-                // Remove este supermercado da lista de "a carregar"
                 _loadingSupermarkets.value = _loadingSupermarkets.value - supermarket
             }
         }
@@ -120,15 +113,13 @@ class SyncViewModel(
     /**
      * Descarrega os produtos de TODOS os supermercados disponíveis.
      */
-    fun downloadAllProducts(supermarkets: List<String>) {
+    fun downloadAllProducts() {
+        val supermarkets = _supermarketNames.value
         supermarkets.forEach { supermarket ->
             downloadProducts(supermarket)
         }
     }
 
-    /**
-     * Obtém os produtos de um supermercado (da cache local).
-     */
     fun getProductsForSupermarket(supermarket: String): List<Product> {
         return _productsMap.value[supermarket] ?: emptyList()
     }
@@ -140,9 +131,13 @@ class SyncViewModel(
         }
     }
 
-    private fun toContent(status: SyncStatusDto, fromCache: Boolean): SyncUiState.Content =
-        SyncUiState.Content(
-            supermarkets = status.supermarkets,
+    private fun toContent(status: SyncStatusDto, fromCache: Boolean): SyncUiState.Content {
+        val supermarketNames = status.supermarkets.map { it.name }
+        // Atualiza a lista de nomes para usar no downloadAllProducts
+        _supermarketNames.value = supermarketNames
+
+        return SyncUiState.Content(
+            supermarkets = supermarketNames,
             hasData = status.hasCurrentWeekData || status.totalProductsThisWeek > 0,
             validityLabel = currentWeekValidity(),
             lastCheckedLabel = LocalTime.now().format(HHMM),
@@ -150,6 +145,7 @@ class SyncViewModel(
             errorMessage = null,
             offline = fromCache
         )
+    }
 
     private fun currentWeekValidity(): String {
         val monday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
@@ -158,7 +154,7 @@ class SyncViewModel(
     }
 
     companion object {
-        private const val TIMEOUT_MS = 30_000L   // USER: leitura < 3s; corta aos 30s
+        private const val TIMEOUT_MS = 30_000L
         private val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         private val DM: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM")
         private val DMY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
