@@ -24,6 +24,9 @@ class AppContainer(context: Context) {
     // O JWT da sessão é injetado em todos os pedidos.
     private val api = ApiClient.create { tokenStore.bearer }
 
+    // Exposto para ViewModels que falam diretamente com a API (ex.: ProductViewModel).
+    val apiService get() = api
+
     private val database = Room.databaseBuilder(
         context.applicationContext,
         FolhetoDatabase::class.java,

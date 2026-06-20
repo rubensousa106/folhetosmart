@@ -21,10 +21,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import androidx.lifecycle.viewmodel.compose.viewModel
+import android.net.Uri
 import com.folhetosmart.R
 import com.folhetosmart.features.admin.AdminScreen
 import com.folhetosmart.features.alerts.AlertsScreen
@@ -34,10 +38,13 @@ import com.folhetosmart.features.legal.TermsOfServiceScreen
 import com.folhetosmart.features.list.ListScreen
 import com.folhetosmart.features.settings.SettingsScreen
 import com.folhetosmart.features.sync.SyncScreen
+import com.folhetosmart.ui.screens.ProductScreen
+import com.folhetosmart.ui.viewmodels.ProductViewModel
 
 /** Rotas fora da bottom navigation (documentos legais). */
 const val ROUTE_PRIVACY_POLICY = "privacy_policy"
 const val ROUTE_TERMS_OF_SERVICE = "terms_of_service"
+const val ROUTE_PRODUCTS = "products"   // folheto de um supermercado: products/{supermarket}
 
 /** Destinos da bottom navigation: Comparar · Lista · Sincronizar · Alertas. */
 sealed class Destination(
@@ -101,8 +108,28 @@ fun FolhetoSmartRoot(isAdmin: Boolean = false, onLogout: () -> Unit = {}) {
             composable(Destination.ShoppingList.route) { ListScreen() }
             composable(Destination.Sync.route) {
                 // A lista de supermercados está sempre visível; o ADMIN tem a
-                // área de upload no fundo (bottom sheet).
-                SyncScreen(isAdmin = isAdmin)
+                // área de upload no fundo (bottom sheet). Tocar numa linha abre o
+                // folheto desse supermercado.
+                SyncScreen(
+                    isAdmin = isAdmin,
+                    onOpenSupermarket = { name ->
+                        navController.navigate("$ROUTE_PRODUCTS/${Uri.encode(name)}")
+                    }
+                )
+            }
+
+            // Folheto de um supermercado (produtos da semana), aberto a partir do
+            // Sincronizar. O argumento é o nome do supermercado (ex.: "Continente").
+            composable(
+                route = "$ROUTE_PRODUCTS/{supermarket}",
+                arguments = listOf(navArgument("supermarket") { type = NavType.StringType })
+            ) { entry ->
+                val supermarket = entry.arguments?.getString("supermarket").orEmpty()
+                ProductScreen(
+                    viewModel = viewModel(factory = ProductViewModel.Factory),
+                    supermarket = supermarket,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(Destination.Alerts.route) { AlertsScreen() }
             composable(Destination.Settings.route) {

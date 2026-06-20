@@ -1,7 +1,12 @@
 package com.folhetosmart.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.folhetosmart.FolhetoSmartApp
 import com.folhetosmart.data.api.ApiService
 import com.folhetosmart.data.models.Product
 import com.folhetosmart.data.models.SupermarketResponse
@@ -38,6 +43,9 @@ class ProductViewModel(
                     } else {
                         _error.value = "Sem dados disponíveis"
                     }
+                } else if (response.code() == 404) {
+                    // Ainda sem folheto para este supermercado — lista vazia (não é erro).
+                    _products.value = emptyList()
                 } else {
                     _error.value = "Erro ao carregar dados: ${response.code()}"
                 }
@@ -51,5 +59,14 @@ class ProductViewModel(
 
     fun clearProducts() {
         _products.value = emptyList()
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val app = this[APPLICATION_KEY] as FolhetoSmartApp
+                ProductViewModel(app.container.apiService)
+            }
+        }
     }
 }

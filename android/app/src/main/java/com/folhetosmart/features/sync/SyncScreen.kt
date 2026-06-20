@@ -1,5 +1,6 @@
 package com.folhetosmart.features.sync
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -67,6 +69,7 @@ import com.folhetosmart.ui.theme.WaitingGrey
 @Composable
 fun SyncScreen(
     isAdmin: Boolean = false,
+    onOpenSupermarket: (String) -> Unit = {},
     viewModel: SyncViewModel = viewModel(factory = SyncViewModel.Factory)
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -104,7 +107,8 @@ fun SyncScreen(
                     s = s,
                     isAdmin = isAdmin,
                     onVerify = viewModel::verify,
-                    onOpenAdmin = { showAdminSheet = true }
+                    onOpenAdmin = { showAdminSheet = true },
+                    onOpenSupermarket = onOpenSupermarket
                 )
             }
         }
@@ -131,7 +135,8 @@ private fun SyncContent(
     s: SyncUiState.Content,
     isAdmin: Boolean,
     onVerify: () -> Unit,
-    onOpenAdmin: () -> Unit
+    onOpenAdmin: () -> Unit,
+    onOpenSupermarket: (String) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -161,7 +166,9 @@ private fun SyncContent(
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
 
-                s.supermarkets.forEach { SupermarketRow(it) }
+                s.supermarkets.forEach { m ->
+                    SupermarketRow(m, onClick = { onOpenSupermarket(m.name) })
+                }
 
                 if (!s.hasData) {
                     Text(
@@ -209,10 +216,12 @@ private fun SyncContent(
 
 /** Uma linha por supermercado: com dados (✅) ou ainda sem dados (⏳). */
 @Composable
-private fun SupermarketRow(m: SupermarketStatusDto) {
+private fun SupermarketRow(m: SupermarketStatusDto, onClick: () -> Unit) {
     val hasData = m.productsImported > 0 || m.syncStatus == "success"
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -256,6 +265,12 @@ private fun SupermarketRow(m: SupermarketStatusDto) {
             style = MaterialTheme.typography.labelMedium,
             color = if (hasData) FolhetoSmartGreen else MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = if (hasData) FontWeight.SemiBold else FontWeight.Normal
+        )
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = "Ver folheto",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
         )
     }
 }
