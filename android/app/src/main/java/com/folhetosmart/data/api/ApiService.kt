@@ -63,6 +63,10 @@ interface ApiService {
         @Query("supermarket") supermarket: String
     ): retrofit2.Response<SupermarketResponse>
 
+    // GET /api/v1/products/all — todos os produtos de todos os supermercados.
+    @GET("api/v1/products/all")
+    suspend fun getAllFlyerProducts(): List<com.folhetosmart.data.models.FlyerOfferingDto>
+
     // --- Comparação ---
     @POST("api/v1/compare")
     suspend fun compare(@Body request: CompareRequest): List<CompareResultDto>

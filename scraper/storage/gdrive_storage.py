@@ -60,13 +60,28 @@ class GoogleDriveStorage:
     @property
     def service(self):
         if self._service is None:
+            import os  # lazy
             from google.oauth2 import service_account  # lazy
             from googleapiclient.discovery import build  # lazy
 
             creds = service_account.Credentials.from_service_account_info(
                 self._creds_info, scopes=SCOPES
             )
-            self._service = build("drive", "v3", credentials=creds, cache_discovery=False)
+            # Em redes com inspeção TLS (dev), FOLHETO_INSECURE_TLS=1 desliga a
+            # verificação de certificado também no cliente do Drive (httplib2) —
+            # tal como já acontece nos pedidos requests/httpx do projeto. Sem
+            # isto, o refresh do token da service account rebenta com
+            # CERTIFICATE_VERIFY_FAILED atrás do proxy de inspeção.
+            if os.getenv("FOLHETO_INSECURE_TLS", "0") == "1":
+                import httplib2  # lazy
+                import google_auth_httplib2  # lazy
+
+                authed = google_auth_httplib2.AuthorizedHttp(
+                    creds, http=httplib2.Http(disable_ssl_certificate_validation=True)
+                )
+                self._service = build("drive", "v3", http=authed, cache_discovery=False)
+            else:
+                self._service = build("drive", "v3", credentials=creds, cache_discovery=False)
         return self._service
 
     # -- operações ------------------------------------------------------------

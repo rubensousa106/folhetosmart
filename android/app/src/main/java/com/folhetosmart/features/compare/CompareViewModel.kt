@@ -7,147 +7,111 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
-import com.folhetosmart.data.api.ProductDto
-import com.folhetosmart.data.api.ProductPriceDto
-import com.folhetosmart.data.repository.AlertsRepository
+import com.folhetosmart.data.models.FlyerOfferingDto
 import com.folhetosmart.data.repository.CompareRepository
-import com.folhetosmart.data.repository.WeekRepository
-import kotlinx.coroutines.FlowPreview
+import com.folhetosmart.data.repository.ShoppingRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 
-/** Estados do ecrã Comparar. */
+/**
+ * Um produto e as suas ofertas, ordenadas por preço (a 1.ª é a mais barata —
+ * destacada no ecrã). Com a normalização do Claude, o mesmo produto de vários
+ * supermercados fica neste grupo.
+ */
+data class ProductGroup(
+    val produto: String,
+    val offers: List<FlyerOfferingDto>
+) {
+    val cheapest: FlyerOfferingDto get() = offers.first()
+    val hasMultiple: Boolean get() = offers.size > 1
+}
+
+/** Estados do ecrã Comparar (montra de todos os produtos dos folhetos). */
 sealed interface CompareUiState {
-    data object Idle : CompareUiState                       // empty state inicial
-    data object Searching : CompareUiState
-    data class Results(
-        val products: List<ProductDto>,
-        val isPromotions: Boolean = false                  // true = promoções da semana
-    ) : CompareUiState
-    data class NoResults(val query: String) : CompareUiState
-    data class LoadingPrices(val product: ProductDto) : CompareUiState
-    data class Prices(
-        val product: ProductDto,
-        val prices: List<ProductPriceDto>,
-        val offline: Boolean
-    ) : CompareUiState
+    data object Loading : CompareUiState
+    data class Content(val groups: List<ProductGroup>) : CompareUiState
+    data class Empty(val query: String) : CompareUiState
     data class Error(val message: String) : CompareUiState
 }
 
-@OptIn(FlowPreview::class)
 class CompareViewModel(
     private val compareRepository: CompareRepository,
-    private val alertsRepository: AlertsRepository,
-    private val weekRepository: WeekRepository
+    private val shoppingRepository: ShoppingRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<CompareUiState>(CompareUiState.Idle)
+    private val _uiState = MutableStateFlow<CompareUiState>(CompareUiState.Loading)
     val uiState: StateFlow<CompareUiState> = _uiState.asStateFlow()
 
     val query = MutableStateFlow("")
 
-    /** Mensagem efémera (snackbar) — ex.: resultado da criação de alerta. */
+    /** Mensagem efémera (snackbar) — ex.: "adicionado à lista". */
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
+    // Todas as ofertas, carregadas uma vez; a pesquisa filtra esta lista em memória.
+    private var allOfferings: List<FlyerOfferingDto> = emptyList()
+    private var loaded = false
+
     init {
-        viewModelScope.launch {
-            query.debounce(400).collectLatest { q ->
-                // Pesquisa vazia (ou < 2 chars) -> promoções da semana (Fix 3).
-                if (q.trim().length < 2) loadPromotions() else search(q)
-            }
-        }
+        load()
     }
 
     fun onQueryChange(value: String) {
         query.value = value
+        if (loaded) applyFilter(value)
     }
 
-    /**
-     * Ecrã de início útil: promoções da semana (search vazio na API).
-     * Fix 5 (offline-first): em falha de rede, recorre à cache local da semana.
-     */
-    private suspend fun loadPromotions() {
-        _uiState.value = CompareUiState.Searching
-        try {
-            val products = compareRepository.search("")
-            _uiState.value = if (products.isNotEmpty()) {
-                CompareUiState.Results(products, isPromotions = true)
-            } else {
-                fromCacheOr(CompareUiState.Idle)
-            }
-        } catch (e: Exception) {
-            _uiState.value = fromCacheOr(
-                CompareUiState.Error("Não foi possível carregar as promoções. Verifica a ligação.")
-            )
-        }
-    }
+    fun reload() = load()
 
-    /** Produtos da cache local da semana, ou o estado de recurso dado. */
-    private suspend fun fromCacheOr(fallback: CompareUiState): CompareUiState {
-        val cached = weekRepository.cachedWeekProducts()
-        return if (cached.isNotEmpty()) {
-            CompareUiState.Results(cached, isPromotions = true)
-        } else {
-            fallback
-        }
-    }
-
-    private suspend fun search(q: String) {
-        _uiState.value = CompareUiState.Searching
-        try {
-            val products = compareRepository.search(q)
-            _uiState.value = if (products.isEmpty()) {
-                CompareUiState.NoResults(q)
-            } else {
-                CompareUiState.Results(products)
-            }
-        } catch (e: Exception) {
-            _uiState.value = CompareUiState.Error(
-                "Não foi possível pesquisar produtos. Verifica a ligação."
-            )
-        }
-    }
-
-    fun selectProduct(product: ProductDto) {
+    private fun load() {
         viewModelScope.launch {
-            _uiState.value = CompareUiState.LoadingPrices(product)
+            _uiState.value = CompareUiState.Loading
             try {
-                val (prices, fromCache) = compareRepository.prices(product.id)
-                _uiState.value = CompareUiState.Prices(product, prices, fromCache)
+                allOfferings = compareRepository.allOfferings()
+                loaded = true
+                applyFilter(query.value)
             } catch (e: Exception) {
                 _uiState.value = CompareUiState.Error(
-                    "Sem preços disponíveis para este produto esta semana."
+                    "Não foi possível carregar os produtos. Verifica a ligação."
                 )
             }
         }
     }
 
-    fun backToResults() {
-        val q = query.value
-        viewModelScope.launch {
-            if (q.trim().length < 2) loadPromotions() else search(q)
+    /** Filtra por nome e agrupa por produto, ordenando cada grupo pelo preço. */
+    private fun applyFilter(rawQuery: String) {
+        val term = rawQuery.trim().lowercase()
+        val matched = if (term.isEmpty()) {
+            allOfferings
+        } else {
+            allOfferings.filter { it.produto.lowercase().contains(term) }
         }
+
+        if (matched.isEmpty()) {
+            _uiState.value = CompareUiState.Empty(rawQuery.trim())
+            return
+        }
+
+        val groups = matched
+            .groupBy { it.produto.trim().lowercase() }
+            .map { (_, offers) ->
+                ProductGroup(
+                    produto = offers.first().produto,
+                    offers = offers.sortedBy { it.preco }
+                )
+            }
+            .sortedBy { it.produto.lowercase() }
+
+        _uiState.value = CompareUiState.Content(groups)
     }
 
-    /** Cria um alerta de preço para o produto atualmente aberto. */
-    fun createAlert(targetPrice: Double?, anyPromotion: Boolean) {
-        val current = _uiState.value as? CompareUiState.Prices ?: return
+    /** Adiciona o produto à lista de compras (carrinho / deslizar para a esquerda). */
+    fun addToList(produto: String) {
         viewModelScope.launch {
-            if (!alertsRepository.isLoggedIn) {
-                _message.value = "Inicia sessão no separador Alertas para criar alertas."
-                return@launch
-            }
-            try {
-                alertsRepository.create(current.product.id, targetPrice, anyPromotion)
-                _message.value = "Alerta criado para ${current.product.displayName} 🔔"
-            } catch (e: Exception) {
-                _message.value = "Não foi possível criar o alerta. Tenta novamente."
-            }
+            shoppingRepository.addByName(produto)
+            _message.value = "“$produto” adicionado à lista 🛒"
         }
     }
 
@@ -161,8 +125,7 @@ class CompareViewModel(
                 val app = this[APPLICATION_KEY] as FolhetoSmartApp
                 CompareViewModel(
                     app.container.compareRepository,
-                    app.container.alertsRepository,
-                    app.container.weekRepository
+                    app.container.shoppingRepository
                 )
             }
         }

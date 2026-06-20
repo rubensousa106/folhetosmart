@@ -4,6 +4,7 @@ import com.folhetosmart.data.api.ApiClient
 import com.folhetosmart.data.api.ApiService
 import com.folhetosmart.data.api.ProductDto
 import com.folhetosmart.data.api.ProductPriceDto
+import com.folhetosmart.data.models.FlyerOfferingDto
 import com.folhetosmart.data.local.CacheDao
 import com.folhetosmart.data.local.CacheEntry
 import com.google.gson.reflect.TypeToken
@@ -17,6 +18,10 @@ class CompareRepository(
 
     suspend fun search(query: String): List<ProductDto> =
         api.searchProducts(search = query).content
+
+    /** Todos os produtos de todos os supermercados (modelo simples dos folhetos). */
+    suspend fun allOfferings(): List<FlyerOfferingDto> =
+        api.getAllFlyerProducts()
 
     /**
      * Preços atuais de um produto. A última consulta de cada produto fica em

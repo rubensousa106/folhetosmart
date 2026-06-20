@@ -26,6 +26,10 @@ class ShoppingRepository(
     suspend fun addProduct(product: ProductDto) =
         shoppingDao.upsert(ShoppingItemEntity(product.id, product.displayName, 1))
 
+    /** Adiciona um produto à lista a partir do nome (folhetos não têm id próprio). */
+    suspend fun addByName(name: String) =
+        shoppingDao.upsert(ShoppingItemEntity(name, name, 1))
+
     suspend fun setQuantity(item: ShoppingItemEntity, quantity: Int) {
         if (quantity <= 0) shoppingDao.delete(item.productId)
         else shoppingDao.upsert(item.copy(quantity = quantity))

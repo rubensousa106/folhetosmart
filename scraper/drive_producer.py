@@ -20,6 +20,16 @@ Variáveis (no .env ou no ambiente):
 """
 from __future__ import annotations
 
+# Em redes com inspeção TLS, confiar no cert store do Windows (onde está o CA da
+# interceção): faz a Anthropic e o Drive (httpx/httplib2) funcionarem SEM mexer
+# no pdf_extractor. Silencioso se o truststore não existir (ex.: no GitHub
+# Actions, sem interceção, usa-se o certifi normal).
+try:
+    import truststore as _truststore
+    _truststore.inject_into_ssl()
+except Exception:
+    pass
+
 import json
 import logging
 import os
@@ -106,9 +116,14 @@ def _extract_or_cache(flyer: dict, supermercado: str) -> list[dict]:
     from pdf_extractor import extract_products_from_pdf  # lazy: só aqui é que gasta IA
 
     produtos = extract_products_from_pdf(str(pdf_path), supermercado)
-    with open(cache, "w", encoding="utf-8") as fh:
-        json.dump(produtos, fh, ensure_ascii=False, indent=2)
-    logger.info("✅ Claude analisou %s: %d produtos (guardado em cache)", supermercado, len(produtos))
+    if produtos:
+        with open(cache, "w", encoding="utf-8") as fh:
+            json.dump(produtos, fh, ensure_ascii=False, indent=2)
+        logger.info("✅ Claude analisou %s: %d produtos (guardado em cache)", supermercado, len(produtos))
+    else:
+        # NÃO grava cache vazia: senão uma falha (ex.: TLS) ficava "colada" e
+        # impedia a reextração na próxima vez.
+        logger.warning("⚠️ %s: extração devolveu 0 produtos — NÃO guardo cache", supermercado)
     return produtos
 
 

@@ -1,8 +1,11 @@
 package com.folhetosmart.products;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.folhetosmart.prices.PriceService;
 import com.folhetosmart.prices.dto.PriceHistoryPointDto;
 import com.folhetosmart.prices.dto.ProductPriceDto;
+import com.folhetosmart.products.dto.FlyerOfferingDto;
 import com.folhetosmart.products.dto.ProductDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,22 +16,32 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/v1/products")
 public class ProductController {
 
+    /** Validade no nome do folheto: "... 16/06/2026 - 22/06/2026.pdf". */
+    private static final Pattern VALIDADE_RE =
+            Pattern.compile("(\\d{2}/\\d{2}/\\d{4})\\s*-\\s*(\\d{2}/\\d{2}/\\d{4})");
+
     private final ProductService productService;
     private final PriceService priceService;
     private final LatestProductsRepository latestProductsRepository;
+    private final ObjectMapper objectMapper;
 
     public ProductController(ProductService productService, PriceService priceService,
-                             LatestProductsRepository latestProductsRepository) {
+                             LatestProductsRepository latestProductsRepository,
+                             ObjectMapper objectMapper) {
         this.productService = productService;
         this.priceService = priceService;
         this.latestProductsRepository = latestProductsRepository;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -74,5 +87,41 @@ public class ProductController {
                 .map(lp -> ResponseEntity.ok(lp.getPayload()))
                 .orElseGet(() -> ResponseEntity.status(404)
                         .body("{\"error\": \"Sem produtos disponíveis para " + supermarket + "\"}"));
+    }
+
+    /**
+     * GET /api/v1/products/all — TODOS os produtos de TODOS os supermercados num
+     * só sítio (modelo simples), cada um com o supermercado e a validade. A app
+     * (Comparar) junta os que têm o mesmo nome e destaca o mais barato.
+     */
+    @GetMapping("/all")
+    public List<FlyerOfferingDto> getAllProducts() {
+        List<FlyerOfferingDto> offerings = new ArrayList<>();
+        for (LatestProducts lp : latestProductsRepository.findAll()) {
+            try {
+                JsonNode root = objectMapper.readTree(lp.getPayload());
+                String supermercado = root.path("supermercado").asText(lp.getSupermarket());
+                String validade = parseValidade(lp.getSourceFlyer());
+                for (JsonNode item : root.path("produtos")) {
+                    String produto = item.path("produto").asText(null);
+                    if (produto == null || produto.isBlank()) {
+                        continue;
+                    }
+                    offerings.add(new FlyerOfferingDto(
+                            produto, item.path("preco").asDouble(0), supermercado, validade));
+                }
+            } catch (Exception ignored) {
+                // um folheto com payload inválido não trava os outros
+            }
+        }
+        return offerings;
+    }
+
+    private static String parseValidade(String sourceFlyer) {
+        if (sourceFlyer == null) {
+            return null;
+        }
+        Matcher m = VALIDADE_RE.matcher(sourceFlyer);
+        return m.find() ? m.group(1) + " a " + m.group(2) : null;
     }
 }
