@@ -49,9 +49,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Públicos
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/promotions").permitAll()
-                        .requestMatchers("/api/v1/compare").permitAll()
+                        // Dados de preços/comparação — NEGÓCIO PRIVADO: só
+                        // utilizadores autenticados (a app envia sempre o JWT).
+                        // Evita que concorrentes "raspem" a base de comparação.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/products/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/promotions").authenticated()
+                        .requestMatchers("/api/v1/compare").authenticated()
                         .requestMatchers("/api/v1/shopping-list/**").permitAll()
                         // Leitura do estado/progresso é pública (a app só lê).
                         .requestMatchers(HttpMethod.GET, "/api/v1/sync/status").permitAll()

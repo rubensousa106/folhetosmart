@@ -140,11 +140,18 @@ class PDFExtractor:
             Extrai todos os produtos e preços desta página do folheto do supermercado {supermarket}.
 
             Regras:
-            1. Identifica o nome do produto (pode estar em várias linhas)
-            2. Identifica o preço (apenas o número, sem "€" ou "KG")
-            3. Devolve APENAS um array JSON válido
+            1. Nome do produto: junta linhas se necessário e INCLUI a quantidade/embalagem
+               quando aparecer (ex.: "1L", "500g", "6x1L", "Pack 6") — serve para distinguir
+               individual de pack.
+            2. Preço (apenas o número): devolve o PREÇO UNITÁRIO que o cliente paga pela
+               embalagem mostrada. Se houver vários preços, usa o preço de VENDA em destaque
+               (promocional) — NÃO o preço por kg/litro, NÃO o preço barrado/anterior. Só usa
+               o preço por kg se o produto for mesmo vendido a peso.
+            3. Se o mesmo produto tiver versão individual E pack, devolve as DUAS como produtos
+               separados (com a quantidade no nome).
+            4. Devolve APENAS um array JSON válido.
 
-            Exemplo: [{{"produto": "Bacalhau Graúdo", "preco": 17.99}}]
+            Exemplo: [{{"produto": "Leite UHT Agros Meio Gordo 1L", "preco": 0.88}}, {{"produto": "Bacalhau Graúdo 1ª", "preco": 17.99}}]
 
             Texto da página:
             {page_text_limited}

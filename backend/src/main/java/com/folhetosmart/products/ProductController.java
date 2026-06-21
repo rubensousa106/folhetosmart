@@ -26,9 +26,9 @@ import java.util.regex.Pattern;
 @RequestMapping("/api/v1/products")
 public class ProductController {
 
-    /** Validade no nome do folheto: "... 16/06/2026 - 22/06/2026.pdf". */
-    private static final Pattern VALIDADE_RE =
-            Pattern.compile("(\\d{2}/\\d{2}/\\d{4})\\s*-\\s*(\\d{2}/\\d{2}/\\d{4})");
+    /** Datas no nome do folheto: 16/06/2026, 16-06-2026, 19062026 (DDMMYYYY) ou 220626 (DDMMYY). */
+    private static final Pattern DATE_TOKEN =
+            Pattern.compile("\\d{1,2}[/-]\\d{1,2}[/-]\\d{4}|\\d{8}|\\d{6}");
 
     private final ProductService productService;
     private final PriceService priceService;
@@ -124,7 +124,34 @@ public class ProductController {
         if (sourceFlyer == null) {
             return null;
         }
-        Matcher m = VALIDADE_RE.matcher(sourceFlyer);
-        return m.find() ? m.group(1) + " a " + m.group(2) : null;
+        Matcher m = DATE_TOKEN.matcher(sourceFlyer);
+        List<String> datas = new ArrayList<>();
+        while (m.find() && datas.size() < 2) {
+            String d = normalizeDate(m.group());
+            if (d != null) {
+                datas.add(d);
+            }
+        }
+        return datas.size() == 2 ? datas.get(0) + " a " + datas.get(1) : null;
+    }
+
+    /** Normaliza um token de data para "DD/MM/AAAA" (aceita /, -, DDMMYYYY, DDMMYY). */
+    private static String normalizeDate(String token) {
+        try {
+            if (token.contains("/") || token.contains("-")) {
+                String[] p = token.split("[/-]");
+                return String.format("%02d/%02d/%04d",
+                        Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2]));
+            }
+            if (token.length() == 8) {
+                return token.substring(0, 2) + "/" + token.substring(2, 4) + "/" + token.substring(4, 8);
+            }
+            if (token.length() == 6) {
+                return token.substring(0, 2) + "/" + token.substring(2, 4) + "/20" + token.substring(4, 6);
+            }
+        } catch (Exception ignored) {
+            // token que não é data válida
+        }
+        return null;
     }
 }

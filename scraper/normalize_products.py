@@ -64,10 +64,15 @@ PROMPT_HEADER = (
     "- Formato: 'Marca Produto Variante Quantidade' (ex.: 'Doritos Queijo 100g'). "
     "Mantém a marca quando existir.\n"
     "- Capitaliza as palavras principais; normaliza unidades (g, kg, L, ml, un).\n"
+    "- Remove códigos tipo 'REF: 1234567' e o prefixo 'Emb.:'/'EMB:' — fica só a "
+    "quantidade ('Emb.: 800 G' → '800g'; 'Emb.: 6 Unid' → '6 un').\n"
     "- Remove texto de marketing/promoção/balcão de atendimento.\n"
+    "- INCLUI SEMPRE a quantidade/tamanho e, se for conjunto, o pack "
+    "(ex.: '6x1L', '4x200ml', '500g', '6 un'). Um produto INDIVIDUAL e um PACK do "
+    "mesmo produto têm nomes canónicos DIFERENTES — NUNCA os juntes.\n"
     "- Frescos sem marca → 'Produto Variante' (ex.: 'Bacalhau Graúdo 1ª').\n"
     "- NÃO inventes informação que não está no nome.\n"
-    "- Produtos DIFERENTES (marca/origem/tamanho diferentes) → nomes canónicos "
+    "- Produtos DIFERENTES (marca/origem/tamanho/pack diferentes) → nomes canónicos "
     "DIFERENTES.\n\n"
     "Devolve APENAS um array JSON: [{\"i\": <número>, \"canonico\": \"<nome>\"}]. "
     "Sem texto à volta.\n\nLista:\n"
@@ -96,11 +101,13 @@ def _backend_token() -> str | None:
     return resp.json().get("token")
 
 
-def _fetch_store(key: str) -> tuple[str, list[dict]] | None:
-    """Produtos atuais de uma loja (GET público /products/latest)."""
+def _fetch_store(key: str, token: str) -> tuple[str, list[dict]] | None:
+    """Produtos atuais de uma loja (GET /products/latest, autenticado)."""
     resp = requests.get(
         f"{_backend_base()}/api/v1/products/latest",
-        params={"supermarket": key}, timeout=120, verify=_verify_tls(),
+        params={"supermarket": key},
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=120, verify=_verify_tls(),
     )
     if resp.status_code != 200:
         return None
@@ -138,7 +145,7 @@ def normalize() -> list[dict]:
     # 1) Recolhe os produtos atuais de cada loja (sem duplicar chaves).
     stores: dict[str, list[dict]] = {}
     for key in dict.fromkeys(STORE_KEYS):
-        res = _fetch_store(key)
+        res = _fetch_store(key, token)
         if res and res[1]:
             nome, produtos = res
             stores.setdefault(nome, produtos)
@@ -152,6 +159,9 @@ def normalize() -> list[dict]:
     for nome, produtos in stores.items():
         for i, p in enumerate(produtos):
             flat.append((nome, i, str(p.get("produto", ""))))
+    # Ordena por nome para que produtos semelhantes de lojas diferentes caiam no
+    # MESMO lote → o Claude atribui-lhes o mesmo nome canónico (melhor matching).
+    flat.sort(key=lambda it: it[2].lower())
     logger.info("🧮 %d produtos no total — a normalizar em lotes de %d", len(flat), BATCH)
 
     # 3) Claude atribui o nome canónico, em lotes.
