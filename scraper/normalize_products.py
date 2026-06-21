@@ -24,6 +24,7 @@ except Exception:
 import json
 import logging
 import os
+import re
 import sys
 
 
@@ -46,6 +47,7 @@ def _load_env_file() -> None:
 _load_env_file()
 
 import requests  # noqa: E402
+from storage.r2_storage import r2_storage  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +115,102 @@ def _fetch_store(key: str, token: str) -> tuple[str, list[dict]] | None:
         return None
     data = resp.json()
     return data.get("supermercado", key), data.get("produtos", [])
+
+
+# --- Validade (mesma lógica do backend) + publicação do feed no R2 ----------
+_DATE_TOKEN = re.compile(r"\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{8}|\d{6}")
+
+
+def _norm_date(tok: str) -> str | None:
+    try:
+        if "/" in tok or "-" in tok:
+            d, m, y = re.split(r"[/-]", tok)
+            return "%02d/%02d/%04d" % (int(d), int(m), int(y))
+        digits = re.sub(r"\D", "", tok)
+        if len(digits) == 8:
+            return f"{digits[0:2]}/{digits[2:4]}/{digits[4:8]}"
+        if len(digits) == 6:
+            return f"{digits[0:2]}/{digits[2:4]}/20{digits[4:6]}"
+    except Exception:
+        return None
+    return None
+
+
+def _parse_validade(flyer: str | None) -> str | None:
+    if not flyer:
+        return None
+    ds = [d for d in (_norm_date(m.group()) for m in _DATE_TOKEN.finditer(flyer)) if d][:2]
+    return f"{ds[0]} a {ds[1]}" if len(ds) == 2 else None
+
+
+def _validade_for(token: str, supermercado: str) -> str | None:
+    try:
+        resp = requests.get(
+            f"{_backend_base()}/api/v1/admin/products/source",
+            params={"supermarket": supermercado},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=60, verify=_verify_tls(),
+        )
+        flyer = resp.json().get("flyer", "") if resp.status_code == 200 else ""
+        return _parse_validade(flyer)
+    except Exception:
+        return None
+
+
+def _publish_feed_to_r2(token: str, stores: dict, canon: dict) -> None:
+    """Constrói o feed (formato /all) e publica-o no R2; envia ao backend o link
+    assinado para o /all passar a redirecionar a app para o R2."""
+    if not r2_storage.is_configured():
+        logger.warning("⚠️ R2 não configurado — feed NÃO publicado (a app usa o /all da BD).")
+        return
+    feed = []
+    for nome, produtos in stores.items():
+        validade = _validade_for(token, nome)
+        for i, p in enumerate(produtos):
+            original = p.get("produto")
+            feed.append({
+                "produto": canon.get((nome, i), original),  # nome canónico
+                "preco": p.get("preco"),
+                "supermercado": nome,
+                "validade": validade,
+                "original": original,
+            })
+    r2_storage.upload_json("produtos.json", feed)
+    url = r2_storage.presign_get("produtos.json")
+    resp = requests.post(
+        f"{_backend_base()}/api/v1/admin/feed-url",
+        json={"url": url},
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=120, verify=_verify_tls(),
+    )
+    if resp.status_code < 400:
+        logger.info("✅ Feed publicado no R2 (%d ofertas) — /all passa a servir do R2", len(feed))
+    else:
+        logger.error("❌ Backend recusou feed-url (%s): %s", resp.status_code, resp.text[:160])
+
+
+def publish_only() -> bool:
+    """Publica no R2 o que JÁ está normalizado no backend (NÃO gasta IA)."""
+    token = _backend_token()
+    if not token:
+        return False
+    logger.info("🔑 Autenticado: %s", _backend_base())
+    stores: dict[str, list[dict]] = {}
+    for key in dict.fromkeys(STORE_KEYS):
+        res = _fetch_store(key, token)
+        if res and res[1]:
+            stores.setdefault(res[0], res[1])
+            logger.info("📦 %s: %d produtos", res[0], len(res[1]))
+    if not stores:
+        logger.error("❌ Nenhuma loja com produtos.")
+        return False
+    canon = {
+        (nome, i): (p.get("canonico") or p.get("produto"))
+        for nome, produtos in stores.items()
+        for i, p in enumerate(produtos)
+    }
+    _publish_feed_to_r2(token, stores, canon)
+    return True
 
 
 def _chunks(seq, n):
@@ -204,14 +302,22 @@ def normalize() -> list[dict]:
         else:
             logger.info("✅ %s: %d produtos republicados com nome canónico", nome, len(enriched))
         resumo.append({"supermercado": nome, "produtos": len(enriched), "enviado": ok})
+
+    _publish_feed_to_r2(token, stores, canon)
     return resumo
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    resultados = normalize()
-    print("\n=== RESUMO ===")
-    for r in resultados:
-        print(r)
-    if not resultados:
-        print("(nada normalizado)")
+    if "--publish" in sys.argv:
+        # Só publica no R2 o que já está normalizado (não chama o Claude).
+        ok = publish_only()
+        print("\n=== PUBLICAÇÃO R2 ===")
+        print("OK" if ok else "FALHOU")
+    else:
+        resultados = normalize()
+        print("\n=== RESUMO ===")
+        for r in resultados:
+            print(r)
+        if not resultados:
+            print("(nada normalizado)")

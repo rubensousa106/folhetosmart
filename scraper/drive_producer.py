@@ -58,11 +58,12 @@ def _load_env_file() -> None:
 _load_env_file()
 
 import requests  # noqa: E402
-from storage.gdrive_storage import drive_storage  # noqa: E402
+from storage.r2_storage import r2_storage  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "data", "json_cache")
+_DOWNLOADS_DIR = os.path.join(os.path.dirname(__file__), "data", "folhetos")
 
 # Deteção do supermercado a partir do NOME CRU do ficheiro do Drive
 # (sem os.path.basename: o nome tem barras nas datas e o Windows trata '/' como
@@ -87,14 +88,8 @@ def _detect_supermarket(filename: str) -> str | None:
 
 
 def _list_flyer_pdfs() -> list[dict]:
-    query = (
-        f"'{drive_storage.folder_id}' in parents "
-        "and mimeType='application/pdf' and trashed=false"
-    )
-    resp = drive_storage.service.files().list(
-        q=query, fields="files(id,name)", orderBy="createdTime desc"
-    ).execute()
-    return resp.get("files", [])
+    """PDFs no bucket R2 (mais recentes primeiro). Cada item: {key, name, modified}."""
+    return r2_storage.list_pdfs()
 
 
 def _cache_path(flyer_name: str) -> str:
@@ -112,7 +107,7 @@ def _extract_or_cache(flyer: dict, supermercado: str) -> list[dict]:
             return json.load(fh)
 
     logger.info("📄 A descarregar e extrair %s (folheto: %s)…", supermercado, flyer["name"])
-    pdf_path = drive_storage.download_pdf(flyer["id"], flyer["name"])
+    pdf_path = r2_storage.download_pdf(flyer["key"], _DOWNLOADS_DIR)
     from pdf_extractor import extract_products_from_pdf  # lazy: só aqui é que gasta IA
 
     produtos = extract_products_from_pdf(str(pdf_path), supermercado)
@@ -185,11 +180,11 @@ def _post_to_backend(token: str, supermercado: str, flyer_name: str, produtos: l
 
 
 def produce(only_supermarket: str | None = None, force: bool = False) -> list[dict]:
-    if not drive_storage.is_configured():
+    if not r2_storage.is_configured():
         logger.error(
-            "❌ Google Drive não configurado — folder_id=%r, credenciais=%s",
-            drive_storage.folder_id,
-            "OK" if drive_storage._creds_info else "EM FALTA",
+            "❌ Cloudflare R2 não configurado — endpoint=%r, bucket=%r, chave=%s",
+            r2_storage.endpoint, r2_storage.bucket,
+            "OK" if r2_storage.access_key else "EM FALTA",
         )
         return []
 

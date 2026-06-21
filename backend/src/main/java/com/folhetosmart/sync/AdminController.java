@@ -103,4 +103,16 @@ public class AdminController {
     public ResponseEntity<Map<String, String>> productsSource(@RequestParam("supermarket") String supermarket) {
         return ResponseEntity.ok(Map.of("flyer", adminService.currentSourceFlyer(supermarket)));
     }
+
+    /**
+     * POST /api/v1/admin/feed-url — o produtor envia o link assinado do R2 onde
+     * está o feed normalizado. O GET /api/v1/products/all passa a redirecionar a
+     * app para esse link (download rápido e privado, fora do Render).
+     */
+    @PostMapping(value = "/feed-url", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Void> setFeedUrl(@RequestBody Map<String, String> body) {
+        String url = body.getOrDefault("url", "").trim();
+        adminService.saveLatestProducts("__feed_url__", 0, null, url);
+        return ResponseEntity.noContent().build();
+    }
 }

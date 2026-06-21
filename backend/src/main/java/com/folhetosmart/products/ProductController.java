@@ -9,6 +9,8 @@ import com.folhetosmart.products.dto.FlyerOfferingDto;
 import com.folhetosmart.products.dto.ProductDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -95,9 +97,20 @@ public class ProductController {
      * (Comparar) junta os que têm o mesmo nome e destaca o mais barato.
      */
     @GetMapping("/all")
-    public List<FlyerOfferingDto> getAllProducts() {
+    public ResponseEntity<?> getAllProducts() {
+        // Se houver feed publicado no R2, redireciona a app para o link assinado
+        // (download rápido/privado fora do Render; a app segue o redirect).
+        var feed = latestProductsRepository.findById("__feed_url__");
+        if (feed.isPresent() && feed.get().getPayload() != null && !feed.get().getPayload().isBlank()) {
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .header(HttpHeaders.LOCATION, feed.get().getPayload()).build();
+        }
+        // Fallback: constrói da BD (enquanto não houver feed no R2).
         List<FlyerOfferingDto> offerings = new ArrayList<>();
         for (LatestProducts lp : latestProductsRepository.findAll()) {
+            if ("__feed_url__".equals(lp.getSupermarket())) {
+                continue;
+            }
             try {
                 JsonNode root = objectMapper.readTree(lp.getPayload());
                 String supermercado = root.path("supermercado").asText(lp.getSupermarket());
@@ -117,7 +130,7 @@ public class ProductController {
                 // um folheto com payload inválido não trava os outros
             }
         }
-        return offerings;
+        return ResponseEntity.ok(offerings);
     }
 
     private static String parseValidade(String sourceFlyer) {
