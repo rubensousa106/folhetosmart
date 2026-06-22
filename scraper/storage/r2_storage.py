@@ -94,6 +94,34 @@ class R2Storage:
             ExpiresIn=expires,
         )
 
+    # -- rotação / limpeza ----------------------------------------------------
+    def list_all(self) -> list[dict]:
+        """Todos os objetos do bucket: {key, modified}."""
+        out: list[dict] = []
+        token = None
+        while True:
+            kw = {"Bucket": self.bucket}
+            if token:
+                kw["ContinuationToken"] = token
+            resp = self.client.list_objects_v2(**kw)
+            for o in resp.get("Contents", []):
+                out.append({"key": o["Key"], "modified": o.get("LastModified")})
+            if resp.get("IsTruncated"):
+                token = resp.get("NextContinuationToken")
+            else:
+                break
+        return out
+
+    def copy(self, src_key: str, dst_key: str) -> None:
+        self.client.copy_object(
+            Bucket=self.bucket,
+            CopySource={"Bucket": self.bucket, "Key": src_key},
+            Key=dst_key,
+        )
+
+    def delete(self, key: str) -> None:
+        self.client.delete_object(Bucket=self.bucket, Key=key)
+
 
 # Instância partilhada.
 r2_storage = R2Storage()

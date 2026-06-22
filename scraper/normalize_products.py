@@ -193,6 +193,12 @@ def _publish_feed_to_r2(token: str, stores: dict, canon: dict, marca: dict) -> N
     )
     if resp.status_code < 400:
         logger.info("✅ Feed publicado no R2 (%d ofertas) — /all passa a servir do R2", len(feed))
+        # Alerta push aos utilizadores: "produtos da semana disponíveis" (best-effort).
+        try:
+            from notifications import notify_new_flyers  # lazy
+            notify_new_flyers(len(feed), len(stores), None)
+        except Exception as exc:  # noqa: BLE001 — a notificação não trava a publicação
+            logger.warning("⚠️ Notificação FCM não enviada (%s)", exc)
     else:
         logger.error("❌ Backend recusou feed-url (%s): %s", resp.status_code, resp.text[:160])
 
