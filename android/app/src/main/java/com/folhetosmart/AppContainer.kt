@@ -31,7 +31,11 @@ class AppContainer(context: Context) {
         context.applicationContext,
         FolhetoDatabase::class.java,
         "folhetosmart.db"
-    ).build()
+    )
+        // Esquema simples e local; ao mudar de versão recria (limpa lista + cache,
+        // o que também força o re-download do feed mais recente).
+        .fallbackToDestructiveMigration()
+        .build()
 
     val syncRepository = SyncRepository(api, database.cacheDao())
     val adminRepository = AdminRepository(api)

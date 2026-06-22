@@ -37,6 +37,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.folhetosmart.data.local.ShoppingItemEntity
 import com.folhetosmart.ui.components.EmptyView
 import com.folhetosmart.ui.components.SavingsSummaryCard
+import com.folhetosmart.ui.theme.FolhetoSmartGreen
 
 /** Ecrã Lista: lista de compras com otimização por supermercado. */
 @Composable
@@ -120,14 +121,26 @@ fun ListScreen(viewModel: ListViewModel = viewModel(factory = ListViewModel.Fact
                 }
             }
 
-            // Itens da lista
-            items(items, key = { it.productId }) { item ->
-                ShoppingItemRow(
-                    item = item,
-                    onIncrease = { viewModel.changeQuantity(item, +1) },
-                    onDecrease = { viewModel.changeQuantity(item, -1) },
-                    onRemove = { viewModel.remove(item) }
-                )
+            // Itens da lista, AGRUPADOS por supermercado.
+            val grouped = items.groupBy { it.supermercado?.takeIf { s -> s.isNotBlank() } ?: "Sem supermercado" }
+            grouped.forEach { (loja, lojaItems) ->
+                item(key = "hdr-$loja") {
+                    Text(
+                        "🛒 $loja",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = FolhetoSmartGreen,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)
+                    )
+                }
+                items(lojaItems, key = { it.productId }) { item ->
+                    ShoppingItemRow(
+                        item = item,
+                        onIncrease = { viewModel.changeQuantity(item, +1) },
+                        onDecrease = { viewModel.changeQuantity(item, -1) },
+                        onRemove = { viewModel.remove(item) }
+                    )
+                }
             }
 
             if (items.isEmpty() && state.searchResults.isEmpty()) {
@@ -171,12 +184,21 @@ private fun ShoppingItemRow(
             Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                item.displayName,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f)
-            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    item.displayName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                if (item.preco > 0.0) {
+                    Text(
+                        "€${String.format("%.2f", item.preco)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = FolhetoSmartGreen
+                    )
+                }
+            }
             IconButton(onClick = onDecrease) {
                 Icon(Icons.Filled.Remove, contentDescription = "Menos um")
             }

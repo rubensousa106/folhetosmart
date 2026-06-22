@@ -112,11 +112,11 @@ class CompareViewModel(
         _uiState.value = CompareUiState.Content(groups)
     }
 
-    /** Adiciona o produto à lista de compras (carrinho / deslizar para a esquerda). */
-    fun addToList(produto: String) {
+    /** Adiciona uma OFERTA específica (produto + supermercado + preço) à lista. */
+    fun addOffer(produto: String, supermercado: String, preco: Double) {
         viewModelScope.launch {
-            shoppingRepository.addByName(produto)
-            _message.value = "“$produto” adicionado à lista 🛒"
+            shoppingRepository.addOffer(produto, supermercado, preco)
+            _message.value = "“$produto” ($supermercado) adicionado à lista 🛒"
         }
     }
 

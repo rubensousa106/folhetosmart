@@ -27,6 +27,8 @@ data class CacheEntry(
 data class ShoppingItemEntity(
     @PrimaryKey @ColumnInfo(name = "product_id") val productId: String,
     @ColumnInfo(name = "display_name") val displayName: String,
+    val supermercado: String? = null,
+    val preco: Double = 0.0,
     val quantity: Int
 )
 
@@ -43,7 +45,7 @@ interface CacheDao {
 @Dao
 interface ShoppingDao {
 
-    @Query("SELECT * FROM shopping_items ORDER BY display_name")
+    @Query("SELECT * FROM shopping_items ORDER BY supermercado, display_name")
     fun observeItems(): Flow<List<ShoppingItemEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -58,7 +60,7 @@ interface ShoppingDao {
 
 @Database(
     entities = [CacheEntry::class, ShoppingItemEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class FolhetoDatabase : RoomDatabase() {

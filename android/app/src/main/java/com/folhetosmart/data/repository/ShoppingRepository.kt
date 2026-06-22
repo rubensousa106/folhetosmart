@@ -24,11 +24,26 @@ class ShoppingRepository(
     val items: Flow<List<ShoppingItemEntity>> = shoppingDao.observeItems()
 
     suspend fun addProduct(product: ProductDto) =
-        shoppingDao.upsert(ShoppingItemEntity(product.id, product.displayName, 1))
+        shoppingDao.upsert(ShoppingItemEntity(
+            productId = product.id, displayName = product.displayName, quantity = 1))
 
     /** Adiciona um produto à lista a partir do nome (folhetos não têm id próprio). */
     suspend fun addByName(name: String) =
-        shoppingDao.upsert(ShoppingItemEntity(name, name, 1))
+        shoppingDao.upsert(ShoppingItemEntity(productId = name, displayName = name, quantity = 1))
+
+    /**
+     * Adiciona uma OFERTA específica (produto + supermercado + preço) à lista. O
+     * mesmo produto de lojas diferentes fica em itens separados — a Lista mostra-os
+     * agrupados por supermercado.
+     */
+    suspend fun addOffer(produto: String, supermercado: String, preco: Double) =
+        shoppingDao.upsert(ShoppingItemEntity(
+            productId = "$produto::$supermercado",
+            displayName = produto,
+            supermercado = supermercado,
+            preco = preco,
+            quantity = 1
+        ))
 
     suspend fun setQuantity(item: ShoppingItemEntity, quantity: Int) {
         if (quantity <= 0) shoppingDao.delete(item.productId)

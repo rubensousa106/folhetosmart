@@ -19,17 +19,13 @@ import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -98,7 +94,9 @@ fun CompareScreen(viewModel: CompareViewModel = viewModel(factory = CompareViewM
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(s.groups, key = { it.produto }) { group ->
-                        ProductGroupCard(group, onAdd = { viewModel.addToList(group.produto) })
+                        ProductGroupCard(group, onAdd = { offer ->
+                            viewModel.addOffer(group.produto, offer.supermercado, offer.preco)
+                        })
                     }
                 }
             }
@@ -111,66 +109,31 @@ fun CompareScreen(viewModel: CompareViewModel = viewModel(factory = CompareViewM
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProductGroupCard(group: ProductGroup, onAdd: () -> Unit) {
-    // Deslizar para a esquerda dispara o "adicionar à lista" e volta ao sítio.
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) onAdd()
-            false
-        }
-    )
-
-    SwipeToDismissBox(
-        state = dismissState,
-        enableDismissFromStartToEnd = false,
-        backgroundContent = {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(FolhetoSmartGreen)
-                    .padding(horizontal = 20.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Icon(
-                    Icons.Filled.AddShoppingCart,
-                    contentDescription = "Adicionar à lista",
-                    tint = Color.White
+private fun ProductGroupCard(group: ProductGroup, onAdd: (FlyerOfferingDto) -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp)) {
+            Text(
+                group.produto,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.size(6.dp))
+            // Uma linha por oferta — cada uma com o seu carrinho (escolhe a loja/preço).
+            group.offers.forEachIndexed { index, offer ->
+                OfferRow(
+                    offer = offer,
+                    highlight = group.hasMultiple && index == 0,
+                    onAdd = { onAdd(offer) }
                 )
-            }
-        }
-    ) {
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        group.produto,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(onClick = onAdd) {
-                        Icon(
-                            Icons.Filled.AddShoppingCart,
-                            contentDescription = "Adicionar à lista",
-                            tint = FolhetoSmartGreen
-                        )
-                    }
-                }
-                Spacer(Modifier.size(6.dp))
-                group.offers.forEachIndexed { index, offer ->
-                    OfferRow(offer, highlight = group.hasMultiple && index == 0)
-                }
             }
         }
     }
 }
 
-/** Uma oferta (supermercado · validade · preço). A mais barata fica destacada. */
+/** Uma oferta (marca · supermercado · validade · preço) + carrinho para a juntar à lista. */
 @Composable
-private fun OfferRow(offer: FlyerOfferingDto, highlight: Boolean) {
+private fun OfferRow(offer: FlyerOfferingDto, highlight: Boolean, onAdd: () -> Unit) {
     val background = if (highlight) FolhetoSmartGreen.copy(alpha = 0.14f) else Color.Transparent
     Row(
         modifier = Modifier
@@ -178,7 +141,7 @@ private fun OfferRow(offer: FlyerOfferingDto, highlight: Boolean) {
             .padding(vertical = 3.dp)
             .clip(MaterialTheme.shapes.small)
             .background(background)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(start = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
@@ -211,12 +174,19 @@ private fun OfferRow(offer: FlyerOfferingDto, highlight: Boolean) {
             color = if (highlight) FolhetoSmartGreen else MaterialTheme.colorScheme.onSurface
         )
         if (highlight) {
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(4.dp))
             Icon(
                 Icons.Filled.Star,
                 contentDescription = "Mais barato",
                 tint = FolhetoSmartGreen,
                 modifier = Modifier.size(18.dp)
+            )
+        }
+        IconButton(onClick = onAdd) {
+            Icon(
+                Icons.Filled.AddShoppingCart,
+                contentDescription = "Adicionar à lista",
+                tint = FolhetoSmartGreen
             )
         }
     }
