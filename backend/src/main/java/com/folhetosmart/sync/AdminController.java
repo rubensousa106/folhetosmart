@@ -34,10 +34,12 @@ public class AdminController {
 
     private final AdminService adminService;
     private final SyncService syncService;
+    private final R2Service r2Service;
 
-    public AdminController(AdminService adminService, SyncService syncService) {
+    public AdminController(AdminService adminService, SyncService syncService, R2Service r2Service) {
         this.adminService = adminService;
         this.syncService = syncService;
+        this.r2Service = r2Service;
     }
 
     /**
@@ -114,5 +116,24 @@ public class AdminController {
         String url = body.getOrDefault("url", "").trim();
         adminService.saveLatestProducts("__feed_url__", 0, null, url);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * POST /api/v1/admin/flyer-upload-url?supermarket=Continente&valid_from=16-06-2026&valid_until=22-06-2026
+     * Devolve um link assinado para a app fazer PUT do PDF do folheto no R2, com
+     * o nome no padrão "{Supermercado} {DD-MM-AAAA} - {DD-MM-AAAA}.pdf".
+     */
+    @PostMapping("/flyer-upload-url")
+    public ResponseEntity<Map<String, String>> flyerUploadUrl(
+            @RequestParam("supermarket") String supermarket,
+            @RequestParam("valid_from") String validFrom,
+            @RequestParam("valid_until") String validUntil) {
+        if (!r2Service.isConfigured()) {
+            return ResponseEntity.status(503).body(Map.of("error", "R2 não configurado no servidor."));
+        }
+        String filename = supermarket.trim() + " " + validFrom + " - " + validUntil + ".pdf";
+        return ResponseEntity.ok(Map.of(
+                "url", r2Service.presignFlyerPut(filename),
+                "filename", filename));
     }
 }

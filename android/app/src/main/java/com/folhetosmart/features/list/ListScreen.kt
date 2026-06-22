@@ -20,7 +20,8 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,8 +37,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.folhetosmart.data.local.ShoppingItemEntity
 import com.folhetosmart.ui.components.EmptyView
-import com.folhetosmart.ui.components.SavingsSummaryCard
 import com.folhetosmart.ui.theme.FolhetoSmartGreen
+import com.folhetosmart.ui.theme.SavingsBadge
 
 /** Ecrã Lista: lista de compras com otimização por supermercado. */
 @Composable
@@ -104,21 +105,9 @@ fun ListScreen(viewModel: ListViewModel = viewModel(factory = ListViewModel.Fact
                 }
             }
 
-            // Resumo da otimização
-            state.result?.let { result ->
-                item(key = "savings") {
-                    Column {
-                        if (state.resultFromCache) {
-                            Text(
-                                "📡 Sem ligação — última otimização guardada",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(bottom = 6.dp)
-                            )
-                        }
-                        SavingsSummaryCard(result = result, itemCount = items.sumOf { it.quantity })
-                    }
-                }
+            // Total da lista por supermercado (calculado localmente).
+            state.totals?.let { totals ->
+                item(key = "totals") { TotalsCard(totals) }
             }
 
             // Itens da lista, AGRUPADOS por supermercado.
@@ -153,20 +142,68 @@ fun ListScreen(viewModel: ListViewModel = viewModel(factory = ListViewModel.Fact
             }
         }
 
-        // Botão de otimizar
+        // Total da lista por supermercado (cálculo local, instantâneo).
         Button(
-            onClick = viewModel::optimize,
-            enabled = items.isNotEmpty() && !state.optimizing,
+            onClick = viewModel::showTotals,
+            enabled = items.isNotEmpty(),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            if (state.optimizing) {
-                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                Spacer(Modifier.size(10.dp))
-                Text("A otimizar…")
-            } else {
-                Text("💰 Otimizar por supermercado")
+            Text("💰 Total por supermercado")
+        }
+    }
+}
+
+/** Total da lista por supermercado + total geral (calculado localmente). */
+@Composable
+private fun TotalsCard(totals: ListTotals) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SavingsBadge)
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(
+                "💰 Total por supermercado",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(6.dp))
+            totals.perStore.forEach { st ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "🏪 ${st.supermercado}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        "€${String.format("%.2f", st.subtotal)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = FolhetoSmartGreen
+                    )
+                }
+            }
+            HorizontalDivider(Modifier.padding(vertical = 6.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Total",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "€${String.format("%.2f", totals.grandTotal)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = FolhetoSmartGreen
+                )
             }
         }
     }

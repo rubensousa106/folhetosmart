@@ -1,5 +1,10 @@
 package com.folhetosmart.features.compare
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +47,7 @@ import com.folhetosmart.data.models.FlyerOfferingDto
 import com.folhetosmart.ui.components.EmptyView
 import com.folhetosmart.ui.components.ErrorView
 import com.folhetosmart.ui.components.LoadingView
+import com.folhetosmart.ui.theme.ErrorRed
 import com.folhetosmart.ui.theme.FolhetoSmartGreen
 
 /**
@@ -159,13 +165,7 @@ private fun OfferRow(offer: FlyerOfferingDto, highlight: Boolean, onAdd: () -> U
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (highlight) FontWeight.Bold else FontWeight.Medium
             )
-            offer.validade?.let {
-                Text(
-                    "Válido: $it",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            offer.validade?.let { ValidadeText(it) }
         }
         Text(
             "€${String.format("%.2f", offer.preco)}",
@@ -189,5 +189,50 @@ private fun OfferRow(offer: FlyerOfferingDto, highlight: Boolean, onAdd: () -> U
                 tint = FolhetoSmartGreen
             )
         }
+    }
+}
+
+/**
+ * Validade da oferta. Quando faltam ≤ 4 dias para o fim, fica a VERMELHO a piscar
+ * (ritmo médio) para o utilizador perceber que o prazo está a acabar.
+ */
+@Composable
+private fun ValidadeText(validade: String) {
+    val diasRestantes = remember(validade) { diasAteFim(validade) }
+    val urgente = diasRestantes != null && diasRestantes in 0..4
+
+    if (urgente) {
+        val transition = rememberInfiniteTransition(label = "validade")
+        val alpha by transition.animateFloat(
+            initialValue = 1f,
+            targetValue = 0.25f,
+            animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+            label = "alpha"
+        )
+        Text(
+            "Válido: $validade",
+            style = MaterialTheme.typography.labelSmall,
+            color = ErrorRed.copy(alpha = alpha),
+            fontWeight = FontWeight.Bold
+        )
+    } else {
+        Text(
+            "Válido: $validade",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** Dias até ao fim da validade ("16/06/2026 a 22/06/2026" → dias até 22/06). */
+private fun diasAteFim(validade: String): Long? {
+    val fim = validade.substringAfterLast(" a ", "").trim()
+    return try {
+        val data = java.time.LocalDate.parse(
+            fim, java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+        )
+        java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), data)
+    } catch (e: Exception) {
+        null
     }
 }

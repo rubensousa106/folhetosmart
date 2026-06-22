@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -115,6 +116,9 @@ fun AdminScreen(
             }
         }
 
+        // Tracker dos produtos por supermercado (feed real).
+        FeedTrackerCard(state = state, onReload = viewModel::loadFeedStatus)
+
         UploadCard(
             state = state,
             onSelectSupermarket = viewModel::selectSupermarket,
@@ -133,6 +137,76 @@ fun AdminScreen(
             onForceSync = viewModel::forceSync,
             onReload = viewModel::loadStatus
         )
+    }
+}
+
+/** Tracker (✓/✗) dos produtos por supermercado, com base no feed real. */
+@Composable
+private fun FeedTrackerCard(state: AdminUiState, onReload: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    "📦 Produtos por supermercado",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                IconButton(onClick = onReload, enabled = !state.feedLoading) {
+                    Icon(Icons.Filled.Sync, contentDescription = "Recarregar")
+                }
+            }
+
+            when {
+                state.feedLoading && state.feedStores.isEmpty() ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Text("A carregar…")
+                    }
+
+                state.feedError != null && state.feedStores.isEmpty() ->
+                    Text(state.feedError, color = ErrorRed)
+
+                else -> state.feedStores.forEach { store ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (store.hasProducts) {
+                            Icon(
+                                Icons.Filled.CheckCircle, contentDescription = "Com produtos",
+                                tint = FolhetoSmartGreen, modifier = Modifier.size(22.dp)
+                            )
+                        } else {
+                            Icon(
+                                Icons.Filled.Cancel, contentDescription = "Sem produtos",
+                                tint = ErrorRed, modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Text(
+                            store.name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            if (store.hasProducts) "${store.count} produtos" else "Sem produtos",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (store.hasProducts) FolhetoSmartGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (store.hasProducts) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -159,9 +233,9 @@ private fun UploadCard(
             )
 
             SupermarketDropdown(
-                items = state.supermarkets,
-                selectedSlug = state.selectedSlug,
-                enabled = !state.isBusy && state.supermarkets.isNotEmpty(),
+                items = AdminUiState.UPLOAD_STORES,
+                selected = state.selectedSupermarket,
+                enabled = !state.isBusy,
                 onSelect = onSelectSupermarket
             )
 
@@ -184,7 +258,7 @@ private fun UploadCard(
 
             state.previewFilename?.let { name ->
                 Text(
-                    "Guardado no Drive como: $name",
+                    "Guardado no Cloudflare como: $name",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -198,13 +272,13 @@ private fun UploadCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SupermarketDropdown(
-    items: List<AdminFlyerStatusDto>,
-    selectedSlug: String?,
+    items: List<String>,
+    selected: String?,
     enabled: Boolean,
     onSelect: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val selectedLabel = items.firstOrNull { it.slug == selectedSlug }?.name ?: "Seleciona…"
+    val selectedLabel = selected ?: "Seleciona…"
 
     ExposedDropdownMenuBox(
         expanded = expanded,
@@ -225,11 +299,11 @@ private fun SupermarketDropdown(
             expanded = expanded,
             onDismissRequest = { expanded = false }
         ) {
-            items.forEach { item ->
+            items.forEach { name ->
                 DropdownMenuItem(
-                    text = { Text(item.name) },
+                    text = { Text(name) },
                     onClick = {
-                        onSelect(item.slug)
+                        onSelect(name)
                         expanded = false
                     }
                 )
@@ -279,13 +353,13 @@ private fun UploadAction(
     onRetry: () -> Unit
 ) {
     when (val phase = state.phase) {
-        is UploadPhase.Uploading -> BusyButton("A enviar para o Drive…")
+        is UploadPhase.Uploading -> BusyButton("A enviar para o Cloudflare…")
 
         is UploadPhase.Processing ->
             BusyButton("A extrair produtos com IA… (pode demorar 1-2 min)")
 
         is UploadPhase.Done -> Banner(
-            text = "✅  ${phase.productsImported} produtos importados",
+            text = "✅  Folheto carregado. Será processado na próxima sincronização.",
             container = SavingsBadge,
             content = FolhetoSmartGreen
         )
@@ -308,7 +382,7 @@ private fun UploadAction(
         ) {
             Icon(Icons.Filled.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Fazer upload para o Drive")
+            Text("Fazer upload para o Cloudflare")
         }
     }
 }

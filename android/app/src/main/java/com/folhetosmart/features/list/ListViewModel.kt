@@ -7,7 +7,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
-import com.folhetosmart.data.api.OptimizeResponseDto
 import com.folhetosmart.data.api.ProductDto
 import com.folhetosmart.data.local.ShoppingItemEntity
 import com.folhetosmart.data.repository.ShoppingRepository
@@ -21,13 +20,17 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+/** Total da lista num supermercado. */
+data class StoreTotal(val supermercado: String, val subtotal: Double, val itemCount: Int)
+
+/** Totais da lista por supermercado + total geral. */
+data class ListTotals(val perStore: List<StoreTotal>, val grandTotal: Double)
+
 /** Estado composto do ecrã Lista. */
 data class ListUiState(
     val searchResults: List<ProductDto> = emptyList(),
     val searching: Boolean = false,
-    val optimizing: Boolean = false,
-    val result: OptimizeResponseDto? = null,
-    val resultFromCache: Boolean = false,
+    val totals: ListTotals? = null,
     val error: String? = null
 )
 
@@ -75,45 +78,45 @@ class ListViewModel(private val repository: ShoppingRepository) : ViewModel() {
     fun addProduct(product: ProductDto) {
         viewModelScope.launch {
             repository.addProduct(product)
-            // Limpa a pesquisa depois de adicionar.
             searchQuery.value = ""
-            _uiState.value = _uiState.value.copy(searchResults = emptyList(), result = null)
+            _uiState.value = _uiState.value.copy(searchResults = emptyList(), totals = null)
         }
     }
 
     fun changeQuantity(item: ShoppingItemEntity, delta: Int) {
         viewModelScope.launch {
             repository.setQuantity(item, item.quantity + delta)
-            _uiState.value = _uiState.value.copy(result = null) // resultado ficou obsoleto
+            _uiState.value = _uiState.value.copy(totals = null) // o total ficou obsoleto
         }
     }
 
     fun remove(item: ShoppingItemEntity) {
         viewModelScope.launch {
             repository.remove(item.productId)
-            _uiState.value = _uiState.value.copy(result = null)
+            _uiState.value = _uiState.value.copy(totals = null)
         }
     }
 
-    fun optimize() {
+    /**
+     * Calcula LOCALMENTE (sem backend) o total da lista por supermercado, usando
+     * o preço e a loja já guardados em cada item.
+     */
+    fun showTotals() {
         val current = items.value
         if (current.isEmpty()) return
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(optimizing = true, error = null)
-            try {
-                val (result, fromCache) = repository.optimize(current)
-                _uiState.value = _uiState.value.copy(
-                    optimizing = false,
-                    result = result,
-                    resultFromCache = fromCache
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    optimizing = false,
-                    error = "Não foi possível otimizar a lista. Verifica a ligação."
+        val perStore = current
+            .groupBy { it.supermercado?.takeIf { s -> s.isNotBlank() } ?: "Sem supermercado" }
+            .map { (loja, its) ->
+                StoreTotal(
+                    supermercado = loja,
+                    subtotal = its.sumOf { it.preco * it.quantity },
+                    itemCount = its.sumOf { it.quantity }
                 )
             }
-        }
+            .sortedBy { it.supermercado }
+        _uiState.value = _uiState.value.copy(
+            totals = ListTotals(perStore, perStore.sumOf { it.subtotal })
+        )
     }
 
     companion object {

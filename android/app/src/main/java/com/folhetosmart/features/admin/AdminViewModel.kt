@@ -10,6 +10,7 @@ import com.folhetosmart.FolhetoSmartApp
 import com.folhetosmart.data.api.SupermarketStatusDto
 import com.folhetosmart.data.api.SyncStatusDto
 import com.folhetosmart.data.repository.AdminRepository
+import com.folhetosmart.data.repository.CompareRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
@@ -27,6 +28,7 @@ import retrofit2.HttpException
  */
 class AdminViewModel(
     private val repository: AdminRepository,
+    private val compareRepository: CompareRepository,
     adminEmail: String?
 ) : ViewModel() {
 
@@ -35,6 +37,7 @@ class AdminViewModel(
 
     init {
         loadStatus()
+        loadFeedStatus()
     }
 
     // -- estado dos folhetos --------------------------------------------------
@@ -70,8 +73,29 @@ class AdminViewModel(
         }
     }
 
+    /** Tracker: estado REAL do feed por supermercado (✓ com produtos / ✗ sem). */
+    fun loadFeedStatus() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(feedLoading = true, feedError = null) }
+            try {
+                val offerings = compareRepository.allOfferings(force = true)
+                val counts = offerings.groupingBy { it.supermercado }.eachCount()
+                val stores = EXPECTED_STORES.map { name ->
+                    FeedStoreStatus(name, counts.containsKey(name), counts[name] ?: 0)
+                }
+                _uiState.update { it.copy(feedLoading = false, feedStores = stores) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(feedLoading = false, feedError = "Não foi possível carregar o estado dos produtos.")
+                }
+            }
+        }
+    }
+
     // -- formulário -----------------------------------------------------------
-    fun selectSupermarket(slug: String) = _uiState.update { it.copy(selectedSlug = slug) }
+    fun selectSupermarket(name: String) = _uiState.update { it.copy(selectedSupermarket = name) }
 
     fun previousWeek() = _uiState.update { it.copy(weekStart = it.weekStart.minusWeeks(1)) }
 
@@ -87,48 +111,23 @@ class AdminViewModel(
     }
 
     // -- upload ---------------------------------------------------------------
+    /**
+     * Upload do PDF para o Cloudflare R2 (link assinado pelo backend; o ficheiro
+     * vai direto app→R2). A extração acontece depois, na sincronização do produtor.
+     */
     fun upload() {
         val s = _uiState.value
-        val slug = s.selectedSlug ?: return
+        val supermarket = s.selectedSupermarket ?: return
         val picked = s.picked ?: return
         if (s.isBusy) return
 
         viewModelScope.launch {
             try {
-                // Passo 1 — guardar no Drive (☁️ A enviar para o Google Drive…).
                 _uiState.update { it.copy(phase = UploadPhase.Uploading) }
-                val drive = repository.uploadToDrive(slug, s.validFrom, s.validUntil, picked.bytes)
-                val driveId = drive.driveFileId
-                    ?: throw IllegalStateException("Sem id do Drive")
-
-                // Passo 2 — extrair com IA (🤖). Síncrono; corta aos 2 min.
-                _uiState.update { it.copy(phase = UploadPhase.Processing) }
-                val result = withTimeout(PROCESS_TIMEOUT_MS) {
-                    repository.processFlyer(driveId, slug, s.validFrom, s.validUntil)
-                }
-
-                if (result.status == "success" && result.productsImported > 0) {
-                    try {
-                        refreshStatus()   // atualiza a lista de folhetos
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        // best-effort: o número importado já veio na resposta
-                    }
-                    _uiState.update {
-                        it.copy(phase = UploadPhase.Done(result.productsImported), picked = null)
-                    }
-                } else {
-                    _uiState.update {
-                        it.copy(phase = UploadPhase.Error(
-                            "A extração não devolveu produtos. Verifica o PDF."))
-                    }
-                }
-            } catch (e: TimeoutCancellationException) {
-                _uiState.update {
-                    it.copy(phase = UploadPhase.Error(
-                        "⚠️ O processamento está a demorar. Tenta novamente mais tarde."))
-                }
+                val (url, _) = repository.flyerUploadUrl(supermarket, s.validFrom, s.validUntil)
+                repository.uploadFlyerToR2(url, picked.bytes)
+                _uiState.update { it.copy(phase = UploadPhase.Done(0), picked = null) }
+                loadFeedStatus()   // atualiza o tracker (muda depois de o produtor processar)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -300,11 +299,16 @@ class AdminViewModel(
         private const val PER_MARKET_TIMEOUT_MS = 2 * 60 * 1000L
         private const val MAX_POLLS = 60 // upload de 1 supermercado: ~2 minutos
         private const val SECONDS_PER_MARKET = 45
+        private val EXPECTED_STORES = listOf("Continente", "Pingo Doce", "Lidl", "Aldi", "Intermarché")
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as FolhetoSmartApp
-                AdminViewModel(app.container.adminRepository, app.container.tokenStore.email)
+                AdminViewModel(
+                    app.container.adminRepository,
+                    app.container.compareRepository,
+                    app.container.tokenStore.email
+                )
             }
         }
     }

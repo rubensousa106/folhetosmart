@@ -14,6 +14,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Url
 
 /** Endpoints REST do backend FolhetoSmart. */
 interface ApiService {
@@ -66,6 +67,20 @@ interface ApiService {
     // GET /api/v1/products/all — todos os produtos de todos os supermercados.
     @GET("api/v1/products/all")
     suspend fun getAllFlyerProducts(): List<com.folhetosmart.data.models.FlyerOfferingDto>
+
+    // Upload de folheto para o R2: pede o link assinado e faz PUT direto ao R2.
+    @POST("api/v1/admin/flyer-upload-url")
+    suspend fun flyerUploadUrl(
+        @Query("supermarket") supermarket: String,
+        @Query("valid_from") validFrom: String,
+        @Query("valid_until") validUntil: String
+    ): Map<String, String>
+
+    @PUT
+    suspend fun uploadFileToUrl(
+        @Url url: String,
+        @Body body: RequestBody
+    ): retrofit2.Response<okhttp3.ResponseBody?>
 
     // --- Comparação ---
     @POST("api/v1/compare")

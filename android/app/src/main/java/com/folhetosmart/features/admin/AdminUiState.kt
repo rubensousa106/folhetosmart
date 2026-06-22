@@ -25,6 +25,9 @@ data class SyncProgress(
     val lines: List<MarketLine>
 )
 
+/** Tracker no Admin: estado do feed por supermercado (✓ com produtos / ✗ sem). */
+data class FeedStoreStatus(val name: String, val hasProducts: Boolean, val count: Int)
+
 /** Fases da máquina de estados do upload (Fix 5). */
 sealed interface UploadPhase {
     /** Sem PDF — ação: "Selecionar PDF". */
@@ -57,8 +60,14 @@ data class AdminUiState(
     val week: String = "",
     val supermarkets: List<AdminFlyerStatusDto> = emptyList(),
 
+    // Tracker baseado no feed real (produtos por supermercado esta semana).
+    val feedStores: List<FeedStoreStatus> = emptyList(),
+    val feedLoading: Boolean = false,
+    val feedError: String? = null,
+
     // Formulário
     val selectedSlug: String? = null,
+    val selectedSupermarket: String? = null,   // nome do supermercado (para o upload R2)
     val weekStart: LocalDate = currentMonday(),
     val picked: PickedPdf? = null,
 
@@ -71,21 +80,19 @@ data class AdminUiState(
     val validUntil: String get() = weekStart.plusDays(6).format(DATE_FMT)
     val weekLabel: String get() = "$validFrom - $validUntil"
 
-    private val selectedName: String?
-        get() = supermarkets.firstOrNull { it.slug == selectedSlug }?.name
-
-    /** Pré-visualização do nome com que o folheto fica guardado no Drive. */
+    /** Pré-visualização do nome com que o folheto fica guardado no R2. */
     val previewFilename: String?
-        get() = selectedName?.let { "$it $weekLabel.pdf" }
+        get() = selectedSupermarket?.let { "$it $weekLabel.pdf" }
 
     val isBusy: Boolean
         get() = phase is UploadPhase.Uploading || phase is UploadPhase.Processing
 
     val canUpload: Boolean
-        get() = selectedSlug != null && picked != null && !isBusy
+        get() = selectedSupermarket != null && picked != null && !isBusy
 
     companion object {
         val DATE_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy")
+        val UPLOAD_STORES = listOf("Continente", "Pingo Doce", "Lidl", "Aldi", "Intermarché")
         fun currentMonday(): LocalDate =
             LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     }

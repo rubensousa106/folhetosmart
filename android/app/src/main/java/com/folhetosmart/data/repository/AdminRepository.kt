@@ -82,6 +82,28 @@ class AdminRepository(private val api: ApiService) {
     ): ProcessFlyerResponseDto =
         api.adminProcessFlyer(ProcessFlyerRequest(driveFileId, slug, validFrom, validUntil))
 
+    // --- Upload para o Cloudflare R2 (link assinado pelo backend) ---
+
+    /** Pede ao backend um link assinado para PUT do PDF no R2 → (url, filename). */
+    suspend fun flyerUploadUrl(
+        supermarket: String,
+        validFrom: String,
+        validUntil: String
+    ): Pair<String, String> {
+        val r = api.flyerUploadUrl(supermarket, validFrom, validUntil)
+        val url = r["url"] ?: throw IllegalStateException("Sem URL de upload do R2.")
+        return url to (r["filename"] ?: "")
+    }
+
+    /** Faz PUT do PDF diretamente para o R2 (o ficheiro não passa pelo Render). */
+    suspend fun uploadFlyerToR2(url: String, pdfBytes: ByteArray) {
+        val body = pdfBytes.toRequestBody("application/pdf".toMediaType())
+        val resp = api.uploadFileToUrl(url, body)
+        if (!resp.isSuccessful) {
+            throw IllegalStateException("O R2 recusou o upload (${resp.code()}).")
+        }
+    }
+
     private fun String.toTextPart(): RequestBody =
         toRequestBody("text/plain".toMediaType())
 }
