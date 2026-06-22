@@ -83,10 +83,15 @@ class CompareViewModel(
     /** Filtra por nome e agrupa por produto, ordenando cada grupo pelo preço. */
     private fun applyFilter(rawQuery: String) {
         val term = rawQuery.trim().lowercase()
+        // Tolerante a singular/plural: "sardinhas" também encontra "sardinha".
+        val stem = term.trimEnd('s').ifEmpty { term }
         val matched = if (term.isEmpty()) {
             allOfferings
         } else {
-            allOfferings.filter { it.produto.lowercase().contains(term) }
+            allOfferings.filter {
+                val hay = (it.produto + " " + (it.marca ?: "")).lowercase()
+                hay.contains(term) || hay.contains(stem)
+            }
         }
 
         if (matched.isEmpty()) {

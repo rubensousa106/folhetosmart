@@ -16,7 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,19 +46,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.folhetosmart.data.api.SupermarketStatusDto
 import com.folhetosmart.features.admin.AdminUploadSheet
 import com.folhetosmart.ui.components.ErrorView
-import com.folhetosmart.ui.components.Formatters
 import com.folhetosmart.ui.components.LoadingView
 import com.folhetosmart.ui.theme.ErrorRed
 import com.folhetosmart.ui.theme.FolhetoSmartGreen
 
 /**
- * Ecrã "Sincronizar" — a lista de supermercados está SEMPRE visível (USER e
- * ADMIN). "Verificar agora" lê o estado num único GET (30s máx); não processa
- * nada. O ADMIN tem uma área extra no fundo para upload de folhetos (abre num
- * bottom sheet).
+ * Ecrã "Sincronizar" (modelo simples): há UM só ficheiro — os produtos
+ * normalizados. Mostra ✓ se sincronizado, ✗ se não, e "Sincronizar agora"
+ * descarrega-o (fica em cache para uso offline). O ADMIN tem, no fundo, a área
+ * de upload de folhetos.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,12 +68,11 @@ fun SyncScreen(
     var showAdminSheet by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Feedback de "Verificar agora": Snackbar verde se há dados, neutro se não.
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is SyncEvent.Checked -> snackbarHostState.showSnackbar(
-                    if (event.hasData) "✅ Dados atualizados" else "Sem novidades por enquanto"
+                    if (event.hasData) "✅ Produtos atualizados" else "Sem novidades por enquanto"
                 )
             }
         }
@@ -96,7 +92,7 @@ fun SyncScreen(
     ) { padding ->
         Box(Modifier.padding(padding)) {
             when (val s = state) {
-                is SyncUiState.Loading -> LoadingView("A carregar promoções…")
+                is SyncUiState.Loading -> LoadingView("A sincronizar…")
                 is SyncUiState.Error -> ErrorView(s.message, onRetry = viewModel::verify)
                 is SyncUiState.Content -> SyncContent(
                     s = s,
@@ -117,7 +113,7 @@ fun SyncScreen(
             AdminUploadSheet(
                 onUploaded = {
                     showAdminSheet = false
-                    viewModel.verify()   // atualiza a lista após importar
+                    viewModel.verify()
                 }
             )
         }
@@ -144,7 +140,7 @@ private fun SyncContent(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    "🛒 Promoções desta semana",
+                    "🛒 Produtos desta semana",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -154,16 +150,44 @@ private fun SyncContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                // Barra de verificação só durante o pedido ao servidor.
                 if (s.checking) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
 
-                s.supermarkets.forEach { SupermarketRow(it) }
-
-                if (!s.hasData) {
+                // O único item: o ficheiro de produtos normalizados (✓ ou ✗).
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (s.synced) {
+                        Icon(
+                            Icons.Filled.CheckCircle, contentDescription = "Sincronizado",
+                            tint = FolhetoSmartGreen, modifier = Modifier.size(24.dp)
+                        )
+                    } else {
+                        Icon(
+                            Icons.Filled.Cancel, contentDescription = "Por sincronizar",
+                            tint = ErrorRed, modifier = Modifier.size(24.dp)
+                        )
+                    }
                     Text(
-                        "Os folhetos são atualizados às quintas-feiras após as 10h00.",
+                        "Produtos",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        if (s.synced) "${s.productCount} produtos" else "Por sincronizar",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (s.synced) FolhetoSmartGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (s.synced) FontWeight.SemiBold else FontWeight.Normal
+                    )
+                }
+
+                if (!s.synced && s.errorMessage == null) {
+                    Text(
+                        "Toca em Sincronizar para descarregar os produtos.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -175,7 +199,7 @@ private fun SyncContent(
 
                 if (!s.lastCheckedLabel.isNullOrBlank()) {
                     Text(
-                        "Última verificação: ${s.lastCheckedLabel}",
+                        "Última sincronização: ${s.lastCheckedLabel}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -186,15 +210,7 @@ private fun SyncContent(
                     enabled = !s.checking,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(if (s.checking) "A verificar…" else "🔄  Verificar agora")
-                }
-
-                if (s.offline) {
-                    Text(
-                        "📡 Sem ligação — a mostrar os últimos dados guardados",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(if (s.checking) "A sincronizar…" else "🔄  Sincronizar agora")
                 }
             }
         }
@@ -202,57 +218,6 @@ private fun SyncContent(
         if (isAdmin) {
             AdminSection(onOpenAdmin)
         }
-    }
-}
-
-/** Uma linha por supermercado: com dados (✅) ou ainda sem dados (⏳). */
-@Composable
-private fun SupermarketRow(m: SupermarketStatusDto) {
-    val hasData = m.productsImported > 0 || m.syncStatus == "success"
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        when {
-            m.syncStatus == "running" -> Icon(
-                Icons.Filled.Sync, contentDescription = "A sincronizar",
-                tint = FolhetoSmartGreen, modifier = Modifier.size(24.dp)
-            )
-            hasData -> Icon(
-                // ✓ — sincronizado com sucesso
-                Icons.Filled.CheckCircle, contentDescription = "Sincronizado",
-                tint = FolhetoSmartGreen, modifier = Modifier.size(24.dp)
-            )
-            else -> Icon(
-                // ✗ — ainda sem dados / por sincronizar
-                Icons.Filled.Cancel, contentDescription = "Por sincronizar",
-                tint = ErrorRed, modifier = Modifier.size(24.dp)
-            )
-        }
-
-        Text(
-            m.name,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f)
-        )
-
-        val trailing = when {
-            m.syncStatus == "running" -> "A processar…"
-            m.syncStatus == "error" -> "Falhou"
-            hasData -> buildString {
-                append("${m.productsImported} produtos")
-                m.syncedAt?.let { append(" · ${Formatters.shortDateTime(it)}") }
-            }
-            else -> "Ainda sem dados"
-        }
-        Text(
-            trailing,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (hasData) FolhetoSmartGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = if (hasData) FontWeight.SemiBold else FontWeight.Normal
-        )
     }
 }
 

@@ -16,5 +16,6 @@ data class FlyerOfferingDto(
     val preco: Double,
     val supermercado: String,
     val validade: String? = null,
-    val original: String? = null  // nome tal como aparece no folheto da loja
+    val original: String? = null, // nome tal como aparece no folheto da loja
+    val marca: String? = null     // marca nacional (ex.: Mimosa) ou vazio
 )

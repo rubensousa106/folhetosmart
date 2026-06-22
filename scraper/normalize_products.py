@@ -26,6 +26,7 @@ import logging
 import os
 import re
 import sys
+from datetime import date
 
 
 def _load_env_file() -> None:
@@ -59,24 +60,27 @@ BATCH = 60  # produtos por chamada ao Claude (evita truncar o output)
 PROMPT_HEADER = (
     "És um normalizador de produtos de folhetos de supermercados portugueses. "
     "Recebes uma lista numerada de nomes de produtos (de vários supermercados). "
-    "Para cada um devolve um NOME CANÓNICO, de forma CONSISTENTE: o MESMO produto "
-    "vendido em supermercados diferentes deve receber EXATAMENTE o mesmo nome "
-    "canónico, para poderem ser comparados.\n\n"
-    "Regras:\n"
-    "- Formato: 'Marca Produto Variante Quantidade' (ex.: 'Doritos Queijo 100g'). "
-    "Mantém a marca quando existir.\n"
+    "Para cada um devolve o NOME CANÓNICO e a MARCA, de forma CONSISTENTE: o MESMO "
+    "produto vendido em supermercados diferentes deve receber EXATAMENTE o mesmo "
+    "nome canónico, para poderem ser comparados.\n\n"
+    "NOME CANÓNICO (campo 'canonico'):\n"
+    "- Nome GENÉRICO do produto, SEM a marca do supermercado (Continente, Pingo Doce, "
+    "Lidl, Aldi, Intermarché, Minipreço, Auchan, Dia, Mercadona...) — essa é a loja, "
+    "mostrada à parte.\n"
+    "- Usa sempre o SINGULAR (ex.: 'Sardinha', nunca 'Sardinhas').\n"
     "- Capitaliza as palavras principais; normaliza unidades (g, kg, L, ml, un).\n"
-    "- Remove códigos tipo 'REF: 1234567' e o prefixo 'Emb.:'/'EMB:' — fica só a "
-    "quantidade ('Emb.: 800 G' → '800g'; 'Emb.: 6 Unid' → '6 un').\n"
+    "- Remove 'REF: 1234567' e o prefixo 'Emb.:'/'EMB:' (fica só a quantidade: "
+    "'Emb.: 800 G' → '800g').\n"
+    "- INCLUI a quantidade/tamanho e, se for conjunto, o pack (ex.: '6x1L', '500g'). "
+    "Individual e pack do mesmo produto têm nomes canónicos DIFERENTES.\n"
     "- Remove texto de marketing/promoção/balcão de atendimento.\n"
-    "- INCLUI SEMPRE a quantidade/tamanho e, se for conjunto, o pack "
-    "(ex.: '6x1L', '4x200ml', '500g', '6 un'). Um produto INDIVIDUAL e um PACK do "
-    "mesmo produto têm nomes canónicos DIFERENTES — NUNCA os juntes.\n"
-    "- Frescos sem marca → 'Produto Variante' (ex.: 'Bacalhau Graúdo 1ª').\n"
     "- NÃO inventes informação que não está no nome.\n"
-    "- Produtos DIFERENTES (marca/origem/tamanho/pack diferentes) → nomes canónicos "
-    "DIFERENTES.\n\n"
-    "Devolve APENAS um array JSON: [{\"i\": <número>, \"canonico\": \"<nome>\"}]. "
+    "- Exemplo: 'Continente Sardinha Inteira Nacional Congelada' → 'Sardinha Inteira Congelada'.\n\n"
+    "MARCA (campo 'marca'):\n"
+    "- A marca NACIONAL/externa do produto (ex.: 'Mimosa', 'Agros', 'Doritos', 'Compal').\n"
+    "- Se for marca-própria do supermercado ou produto sem marca, devolve \"\" (vazio).\n\n"
+    "Devolve APENAS um array JSON: "
+    "[{\"i\": <número>, \"canonico\": \"<nome>\", \"marca\": \"<marca ou vazio>\"}]. "
     "Sem texto à volta.\n\nLista:\n"
 )
 
@@ -157,7 +161,7 @@ def _validade_for(token: str, supermercado: str) -> str | None:
         return None
 
 
-def _publish_feed_to_r2(token: str, stores: dict, canon: dict) -> None:
+def _publish_feed_to_r2(token: str, stores: dict, canon: dict, marca: dict) -> None:
     """Constrói o feed (formato /all) e publica-o no R2; envia ao backend o link
     assinado para o /all passar a redirecionar a app para o R2."""
     if not r2_storage.is_configured():
@@ -174,9 +178,13 @@ def _publish_feed_to_r2(token: str, stores: dict, canon: dict) -> None:
                 "supermercado": nome,
                 "validade": validade,
                 "original": original,
+                "marca": marca.get((nome, i), ""),
             })
-    r2_storage.upload_json("produtos.json", feed)
-    url = r2_storage.presign_get("produtos.json")
+    # Nome com data (organização no R2): produtos_2026-06-21.json
+    key = f"produtos_{date.today().isoformat()}.json"
+    r2_storage.upload_json(key, feed)
+    url = r2_storage.presign_get(key)
+    logger.info("📦 Feed em %s", key)
     resp = requests.post(
         f"{_backend_base()}/api/v1/admin/feed-url",
         json={"url": url},
@@ -209,7 +217,12 @@ def publish_only() -> bool:
         for nome, produtos in stores.items()
         for i, p in enumerate(produtos)
     }
-    _publish_feed_to_r2(token, stores, canon)
+    marca = {
+        (nome, i): p.get("marca", "")
+        for nome, produtos in stores.items()
+        for i, p in enumerate(produtos)
+    }
+    _publish_feed_to_r2(token, stores, canon, marca)
     return True
 
 
@@ -218,8 +231,8 @@ def _chunks(seq, n):
         yield seq[i:i + n]
 
 
-def _canonical_batch(client, model: str, nomes: list[str]) -> list[str]:
-    """Devolve um nome canónico por nome (alinhado por índice)."""
+def _canonical_batch(client, model: str, nomes: list[str]) -> list[tuple[str, str]]:
+    """Devolve (nome canónico, marca) por nome (alinhado por índice)."""
     listagem = "\n".join(f"{i + 1}. {n}" for i, n in enumerate(nomes))
     msg = client.messages.create(
         model=model, max_tokens=4000,
@@ -229,9 +242,16 @@ def _canonical_batch(client, model: str, nomes: list[str]) -> list[str]:
     if texto.startswith("```"):
         texto = texto.split("```")[1].lstrip("json").strip()
     dados = json.loads(texto)
-    canon = {int(d["i"]): str(d["canonico"]).strip() for d in dados}
+    by_i = {
+        int(d["i"]): (str(d.get("canonico") or "").strip(), str(d.get("marca") or "").strip())
+        for d in dados
+    }
     # Fallback ao nome original se o Claude falhar algum índice.
-    return [canon.get(i + 1) or nomes[i] for i in range(len(nomes))]
+    out: list[tuple[str, str]] = []
+    for i in range(len(nomes)):
+        c, m = by_i.get(i + 1, ("", ""))
+        out.append((c or nomes[i], m))
+    return out
 
 
 def normalize() -> list[dict]:
@@ -267,18 +287,21 @@ def normalize() -> list[dict]:
     client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
     canon: dict[tuple[str, int], str] = {}
+    marca: dict[tuple[str, int], str] = {}
     for n, batch in enumerate(_chunks(flat, BATCH), 1):
         nomes = [it[2] for it in batch]
         try:
             resultados = _canonical_batch(client, model, nomes)
-            for it, c in zip(batch, resultados):
+            for it, (c, m) in zip(batch, resultados):
                 canon[(it[0], it[1])] = c
+                marca[(it[0], it[1])] = m
             logger.info("✅ Lote %d/%d normalizado (%d produtos)",
                         n, (len(flat) + BATCH - 1) // BATCH, len(batch))
         except Exception as exc:  # noqa: BLE001
             logger.warning("⚠️ Lote %d falhou (%s) — uso os nomes originais", n, exc)
             for it in batch:
                 canon[(it[0], it[1])] = it[2]
+                marca[(it[0], it[1])] = ""
 
     # 4) Volta a publicar cada loja com o campo `canonico` (sem `flyer` para
     #    NÃO mexer na flag "analisar 1×").
@@ -288,6 +311,7 @@ def normalize() -> list[dict]:
             "produto": p.get("produto"),
             "preco": p.get("preco"),
             "canonico": canon.get((nome, i), p.get("produto")),
+            "marca": marca.get((nome, i), ""),
         } for i, p in enumerate(produtos)]
         resp = requests.post(
             f"{_backend_base()}/api/v1/admin/products",
@@ -303,7 +327,7 @@ def normalize() -> list[dict]:
             logger.info("✅ %s: %d produtos republicados com nome canónico", nome, len(enriched))
         resumo.append({"supermercado": nome, "produtos": len(enriched), "enviado": ok})
 
-    _publish_feed_to_r2(token, stores, canon)
+    _publish_feed_to_r2(token, stores, canon, marca)
     return resumo
 
 

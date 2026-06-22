@@ -25,9 +25,9 @@ class CompareRepository(
      * pedidos e funciona sem internet — e recorre à última cópia guardada se o
      * servidor estiver a dormir / offline.
      */
-    suspend fun allOfferings(): List<FlyerOfferingDto> {
+    suspend fun allOfferings(force: Boolean = false): List<FlyerOfferingDto> {
         val cached = cache.get(KEY_ALL)
-        if (cached != null && System.currentTimeMillis() - cached.updatedAt < FRESH_MS) {
+        if (!force && cached != null && System.currentTimeMillis() - cached.updatedAt < FRESH_MS) {
             return parseOfferings(cached.json)
         }
         return try {

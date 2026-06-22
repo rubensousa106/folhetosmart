@@ -182,20 +182,20 @@ private fun OfferRow(offer: FlyerOfferingDto, highlight: Boolean) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
+            // Marca (só quando é marca nacional; vazio nas marcas-próprias da loja).
+            offer.marca?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Text(
                 offer.supermercado,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (highlight) FontWeight.Bold else FontWeight.Medium
             )
-            // Nome tal como aparece no folheto, quando difere do canónico.
-            offer.original?.takeIf { it.isNotBlank() && it != offer.produto }?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-            }
             offer.validade?.let {
                 Text(
                     "Válido: $it",

@@ -7,8 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
-import com.folhetosmart.data.api.SyncStatusDto
-import com.folhetosmart.data.repository.SyncRepository
+import com.folhetosmart.data.repository.CompareRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -26,69 +25,61 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
 
 /**
- * Ecrã Sincronizar (USER e ADMIN). A lista de supermercados está sempre
- * visível. "Verificar agora" é um único GET de leitura a `/api/v1/sync/status`
- * (sem polling, sem processamento) com tempo-limite de 30s. O ADMIN tem, por
- * baixo, uma área de administração para upload de folhetos.
+ * Ecrã Sincronizar (modelo simples): existe UM só ficheiro — os produtos
+ * normalizados (do R2). "Sincronizar agora" descarrega-o (e fica em cache para
+ * uso offline). ✓ se sincronizado, ✗ se ainda não.
  */
 class SyncViewModel(
-    private val repository: SyncRepository
+    private val compareRepository: CompareRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SyncUiState>(SyncUiState.Loading)
     val uiState: StateFlow<SyncUiState> = _uiState.asStateFlow()
 
-    // Eventos one-shot (Snackbar de "Verificar agora") — só em verificação manual.
     private val _events = MutableSharedFlow<SyncEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<SyncEvent> = _events.asSharedFlow()
 
     init {
-        // Carga automática inicial — sem Snackbar.
+        // Carga automática (usa a cache se estiver fresca) — sem Snackbar.
         verify(manual = false)
     }
 
-    /** Botão "Verificar agora" — lê o estado da BD (30s máx). NÃO processa nada. */
+    /** Botão "Sincronizar agora" — descarrega o ficheiro mais recente. */
     fun verify() = verify(manual = true)
 
     private fun verify(manual: Boolean) {
         viewModelScope.launch {
-            // A lista nunca desaparece: se já há conteúdo, mostra a barra no topo.
             (_uiState.value as? SyncUiState.Content)?.let {
                 _uiState.value = it.copy(checking = true, errorMessage = null)
             }
             try {
-                val (status, fromCache) = withTimeout(TIMEOUT_MS) { repository.status() }
-                val content = toContent(status, fromCache)
+                // Manual = descarrega fresco; automático = cache se estiver fresca.
+                val offerings = withTimeout(TIMEOUT_MS) { compareRepository.allOfferings(force = manual) }
+                val content = SyncUiState.Content(
+                    synced = offerings.isNotEmpty(),
+                    productCount = offerings.size,
+                    validityLabel = currentWeekValidity(),
+                    lastCheckedLabel = LocalTime.now().format(HHMM),
+                    checking = false
+                )
                 _uiState.value = content
-                if (manual) _events.tryEmit(SyncEvent.Checked(content.hasData))
+                if (manual) _events.tryEmit(SyncEvent.Checked(content.synced))
             } catch (e: TimeoutCancellationException) {
-                onCheckFailure("⚠️ Sem resposta. Verifica a tua ligação e tenta novamente.")
+                onCheckFailure("⚠️ Sem resposta. Verifica a ligação e tenta novamente.")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                onCheckFailure("⚠️ Sem resposta. Verifica a tua ligação e tenta novamente.")
+                onCheckFailure("⚠️ Não foi possível sincronizar. Verifica a ligação.")
             }
         }
     }
 
     private fun onCheckFailure(message: String) {
         _uiState.value = when (val s = _uiState.value) {
-            // Mantém a lista visível; mostra só o aviso.
             is SyncUiState.Content -> s.copy(checking = false, errorMessage = message)
             else -> SyncUiState.Error(message)
         }
     }
-
-    private fun toContent(status: SyncStatusDto, fromCache: Boolean): SyncUiState.Content =
-        SyncUiState.Content(
-            supermarkets = status.supermarkets,
-            hasData = status.hasCurrentWeekData || status.totalProductsThisWeek > 0,
-            validityLabel = currentWeekValidity(),
-            lastCheckedLabel = LocalTime.now().format(HHMM),
-            checking = false,
-            errorMessage = null,
-            offline = fromCache
-        )
 
     private fun currentWeekValidity(): String {
         val monday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
@@ -97,7 +88,7 @@ class SyncViewModel(
     }
 
     companion object {
-        private const val TIMEOUT_MS = 30_000L   // USER: leitura < 3s; corta aos 30s
+        private const val TIMEOUT_MS = 45_000L   // sobrevive ao cold-start do Render
         private val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         private val DM: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM")
         private val DMY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
@@ -105,7 +96,7 @@ class SyncViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as FolhetoSmartApp
-                SyncViewModel(app.container.syncRepository)
+                SyncViewModel(app.container.compareRepository)
             }
         }
     }
