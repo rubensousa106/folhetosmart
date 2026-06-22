@@ -69,7 +69,8 @@ class CompareViewModel(
         viewModelScope.launch {
             _uiState.value = CompareUiState.Loading
             try {
-                allOfferings = compareRepository.allOfferings()
+                // Esconde ofertas cuja validade já terminou — o folheto expirou.
+                allOfferings = compareRepository.allOfferings().filterNot { expirou(it.validade) }
                 loaded = true
                 applyFilter(query.value)
             } catch (e: Exception) {
@@ -110,6 +111,25 @@ class CompareViewModel(
             .sortedBy { it.produto.lowercase() }
 
         _uiState.value = CompareUiState.Content(groups)
+    }
+
+    /**
+     * True se a validade da oferta já terminou (data de fim anterior a HOJE).
+     * Formato "16/06/2026 a 22/06/2026" — usa-se a data depois de " a ". No
+     * próprio dia de fim ainda é válida; só desaparece a partir do dia seguinte.
+     * Ofertas sem data legível ficam visíveis (não escondemos o que não sabemos datar).
+     */
+    private fun expirou(validade: String?): Boolean {
+        val fim = validade?.substringAfterLast(" a ", "")?.trim().orEmpty()
+        if (fim.isEmpty()) return false
+        return try {
+            val data = java.time.LocalDate.parse(
+                fim, java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+            )
+            data.isBefore(java.time.LocalDate.now())
+        } catch (e: Exception) {
+            false // data ilegível -> não esconder
+        }
     }
 
     /** Adiciona uma OFERTA específica (produto + supermercado + preço) à lista. */

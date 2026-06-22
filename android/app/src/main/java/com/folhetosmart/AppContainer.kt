@@ -14,6 +14,8 @@ import com.folhetosmart.data.repository.ShoppingRepository
 import com.folhetosmart.data.repository.SyncRepository
 import com.folhetosmart.data.repository.UserRepository
 import com.folhetosmart.data.repository.WeekRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Injeção de dependências manual (suficiente para a dimensão da app). */
 class AppContainer(context: Context) {
@@ -45,4 +47,15 @@ class AppContainer(context: Context) {
     val privacyRepository = PrivacyRepository(api, tokenStore, database.shoppingDao())
     val userRepository = UserRepository(api, tokenStore)
     val weekRepository = WeekRepository(api, database.cacheDao(), appPrefs)
+
+    /**
+     * Termina a sessão: limpa o JWT E apaga TODOS os dados locais (lista de
+     * compras + cache do Comparar em Room). Sem isto, os produtos de quem
+     * estava autenticado continuavam visíveis após o logout. Assim, um
+     * utilizador sem sessão não vê dados de ninguém e é obrigado a autenticar-se.
+     */
+    suspend fun logout() = withContext(Dispatchers.IO) {
+        tokenStore.clear()
+        database.clearAllTables()
+    }
 }

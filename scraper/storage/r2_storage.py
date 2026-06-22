@@ -77,6 +77,19 @@ class R2Storage:
         logger.info("R2: descarregado %s", target.name)
         return target
 
+    def upload_pdf(self, key: str, data) -> None:
+        """Carrega um PDF no bucket (bytes ou caminho de ficheiro).
+
+        Usado pelos scrapers automáticos (ex.: Aldi) para deixar o folheto no R2
+        com o MESMO padrão de nome dos uploads do admin, para que o
+        `drive_producer` o processe com o mesmo extrator (Claude).
+        """
+        body = bytes(data) if isinstance(data, (bytes, bytearray)) else Path(data).read_bytes()
+        self.client.put_object(
+            Bucket=self.bucket, Key=key, Body=body, ContentType="application/pdf",
+        )
+        logger.info("R2: carregado %s (%d bytes)", key, len(body))
+
     # -- JSON normalizado -----------------------------------------------------
     def upload_json(self, key: str, obj) -> None:
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")

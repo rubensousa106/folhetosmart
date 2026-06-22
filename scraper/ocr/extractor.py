@@ -13,7 +13,9 @@ from typing import Optional, Sequence, Union
 from ai_matcher.models import RawProduct
 from config.settings import settings
 from ocr.flyer_parser import parse_blocks
-from ocr.pdf_extractor import extract_blocks_from_images, extract_blocks_from_pdf
+# As funções de blocos OCR vivem no pdf_extractor de topo (não em ocr.pdf_extractor,
+# que não existe) — corrige o ModuleNotFoundError que quebrava o pacote scrapers.
+from pdf_extractor import extract_blocks_from_images, extract_blocks_from_pdf
 
 logger = logging.getLogger(__name__)
 

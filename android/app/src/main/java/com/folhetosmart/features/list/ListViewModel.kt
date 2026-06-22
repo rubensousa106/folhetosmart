@@ -7,16 +7,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
-import com.folhetosmart.data.api.ProductDto
 import com.folhetosmart.data.local.ShoppingItemEntity
 import com.folhetosmart.data.repository.ShoppingRepository
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -26,15 +22,16 @@ data class StoreTotal(val supermercado: String, val subtotal: Double, val itemCo
 /** Totais da lista por supermercado + total geral. */
 data class ListTotals(val perStore: List<StoreTotal>, val grandTotal: Double)
 
-/** Estado composto do ecrã Lista. */
+/** Estado do ecrã Lista (só os totais calculados a pedido). */
 data class ListUiState(
-    val searchResults: List<ProductDto> = emptyList(),
-    val searching: Boolean = false,
-    val totals: ListTotals? = null,
-    val error: String? = null
+    val totals: ListTotals? = null
 )
 
-@OptIn(FlowPreview::class)
+/**
+ * ViewModel da Lista. Os produtos entram na lista a partir do ecrã **Comparar**
+ * (botão de carrinho em cada oferta) — por isso já não há aqui pesquisa: a antiga
+ * barra apontava para um endpoint que deixou de existir no modelo atual.
+ */
 class ListViewModel(private val repository: ShoppingRepository) : ViewModel() {
 
     /** Itens da lista (Room — sobrevive a reinícios e funciona offline). */
@@ -43,45 +40,6 @@ class ListViewModel(private val repository: ShoppingRepository) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ListUiState())
     val uiState: StateFlow<ListUiState> = _uiState.asStateFlow()
-
-    val searchQuery = MutableStateFlow("")
-
-    init {
-        viewModelScope.launch {
-            searchQuery.debounce(400).collectLatest { q ->
-                if (q.length < 2) {
-                    _uiState.value = _uiState.value.copy(searchResults = emptyList(), searching = false)
-                } else {
-                    searchProducts(q)
-                }
-            }
-        }
-    }
-
-    fun onSearchChange(value: String) {
-        searchQuery.value = value
-    }
-
-    private suspend fun searchProducts(query: String) {
-        _uiState.value = _uiState.value.copy(searching = true, error = null)
-        try {
-            val results = repository.searchProducts(query)
-            _uiState.value = _uiState.value.copy(searchResults = results, searching = false)
-        } catch (e: Exception) {
-            _uiState.value = _uiState.value.copy(
-                searching = false,
-                error = "Não foi possível pesquisar produtos."
-            )
-        }
-    }
-
-    fun addProduct(product: ProductDto) {
-        viewModelScope.launch {
-            repository.addProduct(product)
-            searchQuery.value = ""
-            _uiState.value = _uiState.value.copy(searchResults = emptyList(), totals = null)
-        }
-    }
 
     fun changeQuantity(item: ShoppingItemEntity, delta: Int) {
         viewModelScope.launch {
