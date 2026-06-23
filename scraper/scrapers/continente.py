@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import sys
+from html import unescape
 from pathlib import Path
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -55,7 +56,11 @@ def _select_semanal(html: str, week: int) -> str:
 
 def _validity(html: str) -> tuple[dt.date, dt.date]:
     """(início, fim) a partir de 'De DD de Mês até DD de Mês'; cai na semana ISO."""
-    m = re.search(r"De\s+(\d{1,2})\s+de\s+(\w+)\s+at[ée]\s+(\d{1,2})\s+de\s+(\w+)", html, re.IGNORECASE)
+    # A página codifica "até" como "at&eacute;" — descodifica as entidades HTML.
+    m = re.search(
+        r"De\s+(\d{1,2})\s+de\s+(\w+)\s+at[ée]\s+(\d{1,2})\s+de\s+(\w+)",
+        unescape(html), re.IGNORECASE,
+    )
     if not m:
         return fc.week_window()
     try:
