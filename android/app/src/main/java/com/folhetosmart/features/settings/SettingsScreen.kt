@@ -40,13 +40,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import com.folhetosmart.ui.DISTRITOS_PT
+import com.folhetosmart.ui.DistritoCidadeFields
+import com.folhetosmart.ui.UserAvatar
 
 /** Ecrã Definições — conta (perfil) + privacidade e dados (RGPD). */
 @Composable
@@ -218,8 +220,7 @@ fun SettingsScreen(
     }
 }
 
-/** "A minha conta" — editar nome, distrito/cidade, email e palavra-passe. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** "A minha conta" — avatar (animal) → escolher o que editar: nome, zona, email, password. */
 @Composable
 private fun AccountCard(
     state: SettingsUiState,
@@ -230,106 +231,141 @@ private fun AccountCard(
     var name by remember(state.name) { mutableStateOf(state.name) }
     var district by remember(state.district) { mutableStateOf(state.district) }
     var city by remember(state.city) { mutableStateOf(state.city) }
-    var expanded by remember { mutableStateOf(false) }
-
     var newEmail by remember(state.email) { mutableStateOf(state.email) }
     var emailPwd by remember { mutableStateOf("") }
-
     var curPwd by remember { mutableStateOf("") }
     var newPwd by remember { mutableStateOf("") }
 
+    var menuOpen by remember { mutableStateOf(false) }
+    var section by remember { mutableStateOf<String?>(null) }
+
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Text(
-                "A minha conta",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(12.dp))
-
-            // --- Perfil: nome + distrito + cidade ---
-            OutlinedTextField(
-                value = name, onValueChange = { name = it },
-                label = { Text("Nome") }, singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(8.dp))
-            ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-                OutlinedTextField(
-                    value = district ?: "", onValueChange = {}, readOnly = true,
-                    label = { Text("Distrito") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor()
-                )
-                ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    DISTRITOS_PT.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(option) },
-                            onClick = { district = option; expanded = false }
+            // Cabeçalho: avatar (animal do utilizador) + nome/email + menu de edição.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box {
+                    UserAvatar(
+                        seed = state.email.ifBlank { "folhetosmart" },
+                        onClick = { menuOpen = true }
+                    )
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text("Alterar nome") },
+                            onClick = { section = "nome"; menuOpen = false })
+                        DropdownMenuItem(text = { Text("Alterar zona") },
+                            onClick = { section = "zona"; menuOpen = false })
+                        DropdownMenuItem(text = { Text("Alterar email") },
+                            onClick = { section = "email"; menuOpen = false })
+                        DropdownMenuItem(text = { Text("Alterar palavra-passe") },
+                            onClick = { section = "password"; menuOpen = false })
+                    }
+                }
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .padding(start = 12.dp)
+                ) {
+                    Text(
+                        name.ifBlank { "A minha conta" },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (state.email.isNotBlank()) {
+                        Text(
+                            state.email,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(Icons.Filled.Edit, contentDescription = "Editar conta")
+                }
             }
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = city, onValueChange = { city = it },
-                label = { Text("Cidade") }, singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = { onSaveProfile(name, district, city) },
-                enabled = !state.savingProfile,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(if (state.savingProfile) "A guardar…" else "Guardar perfil") }
 
-            HorizontalDivider(Modifier.padding(vertical = 16.dp))
-
-            // --- Email (exige a palavra-passe atual) ---
-            OutlinedTextField(
-                value = newEmail, onValueChange = { newEmail = it },
-                label = { Text("Email") }, singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = emailPwd, onValueChange = { emailPwd = it },
-                label = { Text("Palavra-passe atual") }, singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { onChangeEmail(emailPwd, newEmail); emailPwd = "" },
-                enabled = !state.savingEmail && emailPwd.isNotBlank() &&
-                    newEmail.isNotBlank() && newEmail != state.email,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(if (state.savingEmail) "A alterar…" else "Alterar email") }
-
-            HorizontalDivider(Modifier.padding(vertical = 16.dp))
-
-            // --- Palavra-passe ---
-            OutlinedTextField(
-                value = curPwd, onValueChange = { curPwd = it },
-                label = { Text("Palavra-passe atual") }, singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = newPwd, onValueChange = { newPwd = it },
-                label = { Text("Nova palavra-passe (mín. 8)") }, singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { onChangePassword(curPwd, newPwd); curPwd = ""; newPwd = "" },
-                enabled = !state.savingPassword && curPwd.isNotBlank() && newPwd.length >= 8,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(if (state.savingPassword) "A alterar…" else "Alterar palavra-passe") }
+            // Editor da secção escolhida (toca no avatar para escolher).
+            when (section) {
+                "nome" -> {
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = name, onValueChange = { name = it },
+                        label = { Text("Nome") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { onSaveProfile(name, district, city) },
+                        enabled = !state.savingProfile,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text(if (state.savingProfile) "A guardar…" else "Guardar nome") }
+                }
+                "zona" -> {
+                    Spacer(Modifier.height(12.dp))
+                    DistritoCidadeFields(
+                        distrito = district,
+                        cidade = city,
+                        onDistritoChange = { district = it; city = "" },
+                        onCidadeChange = { city = it }
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { onSaveProfile(name, district, city) },
+                        enabled = !state.savingProfile,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text(if (state.savingProfile) "A guardar…" else "Guardar zona") }
+                }
+                "email" -> {
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = newEmail, onValueChange = { newEmail = it },
+                        label = { Text("Novo email") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = emailPwd, onValueChange = { emailPwd = it },
+                        label = { Text("Palavra-passe atual") }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { onChangeEmail(emailPwd, newEmail); emailPwd = "" },
+                        enabled = !state.savingEmail && emailPwd.isNotBlank() &&
+                            newEmail.isNotBlank() && newEmail != state.email,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text(if (state.savingEmail) "A alterar…" else "Alterar email") }
+                }
+                "password" -> {
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = curPwd, onValueChange = { curPwd = it },
+                        label = { Text("Palavra-passe atual") }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = newPwd, onValueChange = { newPwd = it },
+                        label = { Text("Nova palavra-passe (mín. 8)") }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { onChangePassword(curPwd, newPwd); curPwd = ""; newPwd = "" },
+                        enabled = !state.savingPassword && curPwd.isNotBlank() && newPwd.length >= 8,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text(if (state.savingPassword) "A alterar…" else "Alterar palavra-passe") }
+                }
+                else -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Toca no avatar para alterar o nome, a zona, o email ou a palavra-passe.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }

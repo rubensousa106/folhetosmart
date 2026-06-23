@@ -11,7 +11,14 @@ Cloudflare R2. Modelo **"processa 1×/semana, lê N×"** — sem Playwright/OCR/
 | `normalize_products.py` | Pede à Claude um **nome canónico + marca** por produto, junta as lojas, constrói o feed e publica `produtos_AAAA-MM-DD.json` no R2 + `POST /admin/feed-url`. `--publish` republica sem IA. |
 | `rotate_r2.py` | Limpeza semanal do bucket: folhetos antigos → `backup/`; apaga de `backup/` o que lá está há > 6 dias. `--dry-run` mostra sem mexer. |
 | `pdf_extractor.py` | Extrator (pdfplumber + Claude). ⚠️ **Não mexer sem testar** (`test_pdf.py`). |
-| `scrapers/aldi.py` | Folheto do Aldi (requests + BeautifulSoup; 7 regiões, fallback nacional). |
+| `scrapers/aldi.py` | Folheto do Aldi (requests; 7 regiões, fallback nacional). |
+| `scrapers/pingodoce.py` | Folheto do Pingo Doce ("Poupe Esta Semana"); mesmo mecanismo `…/GetPDF.ashx`. |
+| `scrapers/continente.py` | Folheto Semanal do Continente (escolhe o principal; `…/GetPDF.ashx`). |
+| `scrapers/_flyer_common.py` | Helpers partilhados pelos scrapers (sessão, download, R2). |
+| `report_flyers.py` | Relatório semanal: que supermercados têm PDF no R2 / em falta (escreve `relatorios/ultimo.txt`). |
+
+> **Lidl** (viewer Schwarz) e **Intermarché** (anti-bot 403) não têm scraper automático —
+> entram por upload manual pela app. Ver a automação n8n em [`deploy/n8n/`](../deploy/n8n/).
 | `storage/r2_storage.py` | Cliente R2 (boto3, lazy). |
 | `notifications/` | FCM ("há folhetos novos"). `db.py` — Postgres (só tokens FCM). |
 

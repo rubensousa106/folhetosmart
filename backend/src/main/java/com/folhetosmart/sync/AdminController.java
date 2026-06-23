@@ -72,7 +72,14 @@ public class AdminController {
     @PostMapping(value = "/feed-url", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Void> setFeedUrl(@RequestBody Map<String, String> body) {
         String url = body.getOrDefault("url", "").trim();
-        adminService.saveLatestProducts("__feed_url__", 0, null, url);
+        String id = body.getOrDefault("id", "").trim().toLowerCase();
+        String validUntil = body.getOrDefault("valid_until", "").trim();
+        // Multi-feed: cada feed tem o seu slot — "__feed_url__" por omissão, ou
+        // "__feed_url__<id>" para feeds separados (ex.: Aldi com datas próprias).
+        // O valid_until vai no source_flyer e serve para o GET /feeds ignorar
+        // feeds já totalmente expirados.
+        String key = id.isBlank() ? "__feed_url__" : "__feed_url__" + id;
+        adminService.saveLatestProducts(key, 0, validUntil.isBlank() ? null : validUntil, url);
         return ResponseEntity.noContent().build();
     }
 

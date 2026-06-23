@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -131,6 +132,44 @@ public class ProductController {
             }
         }
         return ResponseEntity.ok(offerings);
+    }
+
+    /**
+     * GET /api/v1/products/feeds — lista os links assinados dos feeds ATIVOS no R2
+     * (multi-feed: supermercados principais + Aldi com datas próprias). A app
+     * descarrega todos e funde-os. Ignora feeds já totalmente expirados.
+     */
+    @GetMapping("/feeds")
+    public List<String> feeds() {
+        LocalDate today = LocalDate.now();
+        List<String> urls = new ArrayList<>();
+        for (LatestProducts lp : latestProductsRepository.findAll()) {
+            String key = lp.getSupermarket();
+            if (key == null || !key.startsWith("__feed_url__")) {
+                continue;
+            }
+            String url = lp.getPayload();
+            if (url == null || url.isBlank() || feedExpired(lp.getSourceFlyer(), today)) {
+                continue;
+            }
+            urls.add(url);
+        }
+        return urls;
+    }
+
+    /** True se a data de fim (DD-MM-AAAA, guardada no source_flyer) já passou. */
+    private static boolean feedExpired(String validUntil, LocalDate today) {
+        if (validUntil == null || validUntil.isBlank()) {
+            return false; // sem data -> assume válido
+        }
+        try {
+            String[] p = validUntil.trim().split("-");
+            LocalDate end = LocalDate.of(
+                    Integer.parseInt(p[2]), Integer.parseInt(p[1]), Integer.parseInt(p[0]));
+            return end.isBefore(today);
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private static String parseValidade(String sourceFlyer) {

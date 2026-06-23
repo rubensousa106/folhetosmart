@@ -18,10 +18,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -42,7 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.folhetosmart.features.legal.PrivacyPolicyScreen
 import com.folhetosmart.features.legal.TermsOfServiceScreen
-import com.folhetosmart.ui.DISTRITOS_PT
+import com.folhetosmart.ui.DistritoCidadeFields
 
 /**
  * Registo em 2 passos (Fix 1):
@@ -244,7 +240,6 @@ private fun AccountStep(
 }
 
 /** Passo 2 — localização para o folheto regional do Aldi (opcional). */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LocationStep(
     submitting: Boolean,
@@ -254,7 +249,6 @@ private fun LocationStep(
 ) {
     var district by remember { mutableStateOf<String?>(null) }
     var city by remember { mutableStateOf("") }
-    var expanded by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -276,41 +270,11 @@ private fun LocationStep(
             modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
         )
 
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = it }
-        ) {
-            OutlinedTextField(
-                value = district ?: "",
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Distrito") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .menuAnchor()
-            )
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                DISTRITOS_PT.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option) },
-                        onClick = {
-                            district = option
-                            expanded = false
-                        }
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        OutlinedTextField(
-            value = city,
-            onValueChange = { city = it },
-            label = { Text("Cidade") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+        DistritoCidadeFields(
+            distrito = district,
+            cidade = city,
+            onDistritoChange = { district = it; city = "" },
+            onCidadeChange = { city = it }
         )
 
         error?.let {

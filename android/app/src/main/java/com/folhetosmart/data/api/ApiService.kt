@@ -26,9 +26,17 @@ interface ApiService {
     suspend fun syncRun(@Path("id") runId: String): SyncRunDto
 
     // --- Produtos dos folhetos ---
-    // GET /api/v1/products/all — todos os produtos de todos os supermercados.
+    // GET /api/v1/products/all — todos os produtos (redirect 302 para 1 feed; compat).
     @GET("api/v1/products/all")
     suspend fun getAllFlyerProducts(): List<com.folhetosmart.data.models.FlyerOfferingDto>
+
+    // Multi-feed: lista de links assinados (R2) dos feeds ATIVOS desta semana.
+    @GET("api/v1/products/feeds")
+    suspend fun getFeeds(): List<String>
+
+    // Descarrega um feed diretamente do R2 (link assinado devolvido por getFeeds).
+    @GET
+    suspend fun downloadFeed(@Url url: String): List<com.folhetosmart.data.models.FlyerOfferingDto>
 
     // Upload de folheto para o R2: pede o link assinado e faz PUT direto ao R2.
     @POST("api/v1/admin/flyer-upload-url")

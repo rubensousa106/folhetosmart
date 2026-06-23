@@ -79,6 +79,20 @@ PROMPT_HEADER = (
     "MARCA (campo 'marca'):\n"
     "- A marca NACIONAL/externa do produto (ex.: 'Mimosa', 'Agros', 'Doritos', 'Compal').\n"
     "- Se for marca-própria do supermercado ou produto sem marca, devolve \"\" (vazio).\n\n"
+    "- REGRAS ADICIONAIS IMPORTANTES:\n"
+    "- Padroniza unidades**: 'G' → 'g', 'KG' → 'kg', 'L' → 'l', 'ML' → 'ml', 'UN' → 'un'.\n"
+    "- Formata números**: '1,2' → '1.2', '1.200' → '1200'.\n"
+    "- Produtos com variantes**: se a lista incluir 'Bife da Vazia' e 'Vazia', normaliza para o mesmo nome base.\n"
+    "- Produtos de diferentes marcas**: 'Leite Mimosa' e 'Leite Agros' → 'Leite' (a marca vai para o campo 'marca').\n"
+    "- Produtos com diferentes pesos**: 'Leite 1L' e 'Leite 2L' → têm nomes canónicos diferentes porque a quantidade é diferente.\n"
+    "- Variações de sabor**: inclui o sabor no nome canónico, mas de forma genérica (ex.: 'Iogurte Morango', 'Iogurte Baunilha').\n"
+    "- Produtos de higiene/limpeza**: mantém a função principal (ex.: 'Champô' em vez de 'Champô Protetor').\n"
+
+    "MARCA (campo 'marca'):\n"
+    "- A marca NACIONAL/externa do produto (ex.: 'Mimosa', 'Agros', 'Doritos', 'Compal', 'Nestlé', 'Lay's').\n"
+    "- Se for marca-própria do supermercado (ex.: 'Continente Equilíbrio', 'Pingo Doce', 'Lidl') ou produto sem marca, devolve "" (vazio).\n"
+    "- Para produtos de higiene/limpeza, devolve a marca se for conhecida e não for a do supermercado.\n"
+
     "Devolve APENAS um array JSON: "
     "[{\"i\": <número>, \"canonico\": \"<nome>\", \"marca\": \"<marca ou vazio>\"}]. "
     "Sem texto à volta.\n\nLista:\n"
@@ -161,6 +175,38 @@ def _validade_for(token: str, supermercado: str) -> str | None:
         return None
 
 
+def _date_obj(token_date: str):
+    """'DD/MM/AAAA' -> datetime.date, ou None se ilegível."""
+    try:
+        d, m, y = token_date.strip().split("/")
+        return date(int(y), int(m), int(d))
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _feed_span_key(validades: list[str]) -> str:
+    """Nome do feed pelo INTERVALO de validade entre TODAS as lojas:
+    `produtos_{inicio_mais_cedo}_{fim_mais_tarde}.json` (datas DD-MM-AAAA).
+
+    Ex.: Continente 22/06–27/06 + Aldi 25/06–30/06 -> produtos_22-06-2026_30-06-2026.json.
+    Cai na data de hoje se não houver validades legíveis. (Não se usa '/' no nome
+    porque no R2 criaria pastas.)
+    """
+    starts, ends = [], []
+    for v in validades:
+        if not v or " a " not in v:
+            continue
+        ini, fim = v.split(" a ", 1)
+        s, e = _date_obj(ini), _date_obj(fim)
+        if s:
+            starts.append(s)
+        if e:
+            ends.append(e)
+    if starts and ends:
+        return f"produtos_{min(starts):%d-%m-%Y}_{max(ends):%d-%m-%Y}.json"
+    return f"produtos_{date.today():%d-%m-%Y}.json"
+
+
 def _publish_feed_to_r2(token: str, stores: dict, canon: dict, marca: dict) -> None:
     """Constrói o feed (formato /all) e publica-o no R2; envia ao backend o link
     assinado para o /all passar a redirecionar a app para o R2."""
@@ -168,8 +214,11 @@ def _publish_feed_to_r2(token: str, stores: dict, canon: dict, marca: dict) -> N
         logger.warning("⚠️ R2 não configurado — feed NÃO publicado (a app usa o /all da BD).")
         return
     feed = []
+    validades: list[str] = []
     for nome, produtos in stores.items():
         validade = _validade_for(token, nome)
+        if validade:
+            validades.append(validade)
         for i, p in enumerate(produtos):
             original = p.get("produto")
             feed.append({
@@ -180,14 +229,19 @@ def _publish_feed_to_r2(token: str, stores: dict, canon: dict, marca: dict) -> N
                 "original": original,
                 "marca": marca.get((nome, i), ""),
             })
-    # Nome com data (organização no R2): produtos_2026-06-21.json
-    key = f"produtos_{date.today().isoformat()}.json"
+    # Nome pelo intervalo de validade (início mais cedo -> fim mais tarde).
+    key = _feed_span_key(validades)
     r2_storage.upload_json(key, feed)
     url = r2_storage.presign_get(key)
-    logger.info("📦 Feed em %s", key)
+    # Data de fim mais tarde — o backend usa-a no /feeds para ignorar feeds já
+    # totalmente expirados (DD-MM-AAAA).
+    ends = [_date_obj(v.split(" a ", 1)[1]) for v in validades if v and " a " in v]
+    ends = [e for e in ends if e]
+    valid_until = max(ends).strftime("%d-%m-%Y") if ends else ""
+    logger.info("📦 Feed em %s (válido até %s)", key, valid_until or "?")
     resp = requests.post(
         f"{_backend_base()}/api/v1/admin/feed-url",
-        json={"url": url},
+        json={"url": url, "valid_until": valid_until},
         headers={"Authorization": f"Bearer {token}"},
         timeout=120, verify=_verify_tls(),
     )

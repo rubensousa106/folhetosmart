@@ -43,6 +43,22 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
+
+def _load_env() -> None:
+    """Carrega o .env (raiz do projeto) para as R2_* ao correr como script."""
+    for path in (os.path.join(_ROOT, ".env"), os.path.join(_ROOT, "..", ".env")):
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        os.environ.setdefault(k.strip(), v.strip())
+            return
+
+
+_load_env()
+
 # Rede com inspeção TLS: confiar no cert store do SO (silencioso se ausente).
 try:
     import truststore as _truststore
