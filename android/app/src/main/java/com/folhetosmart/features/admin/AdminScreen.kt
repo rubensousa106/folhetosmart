@@ -128,15 +128,6 @@ fun AdminScreen(
             onUpload = viewModel::upload,
             onRetry = viewModel::retry
         )
-
-        // Progresso detalhado do processamento — só no ecrã Admin.
-        state.syncProgress?.let { SyncProgressCard(it) }
-
-        FlyersStatusCard(
-            state = state,
-            onForceSync = viewModel::forceSync,
-            onReload = viewModel::loadStatus
-        )
     }
 }
 

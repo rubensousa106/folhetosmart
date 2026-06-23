@@ -1,77 +1,104 @@
-"""Scraper do Aldi — folheto regional (varia por região do país).
+"""Scraper do Aldi — folheto regional (7 regiões).
+
+Regiões (decidido c/ Ruben): Norte · Centro · Lisboa · Sul (Alentejo) · Algarve
+· Açores · Madeira.
 
 MECANISMO (mais fiável do que navegar dropdowns com Playwright):
 o Aldi publica o folheto da semana num URL regional previsível e a página tem
 um botão "Descarregar" que aponta para um GetPDF.ashx. Resolvemos a região a
 partir do distrito/cidade, montamos o URL da semana atual e seguimos o link.
 
-    distrito/cidade ─► código de região (n/c/l/a/g/ac/md)
-    ─► https://www.aldi.pt/folheto/esta-semana-{cod}.html
+    distrito/cidade ─► região (norte/…/madeira) ─► slug de URL
+    ─► https://www.aldi.pt/folheto/esta-semana-{slug}.html
     ─► <a> "Descarregar" (…/GetPDF.ashx) ─► download do PDF
     ─► pdf_extractor.extract_products_from_pdf("…", "Aldi") ─► produtos
 
-INTEGRAÇÃO: o projeto migrou do Google Drive para o Cloudflare R2. Por isso, em
-vez de `upload_to_drive`, usa-se `download_to_r2()`: carrega o PDF no bucket com
-o MESMO padrão de nome dos uploads do admin ("Aldi DD-MM-YYYY - DD-MM-YYYY.pdf"),
-para que o `drive_producer` o processe com o MESMO extrator (Claude) e a app o
-receba na próxima sincronização — sem código de extração/normalização duplicado.
+INTEGRAÇÃO: o projeto migrou do Google Drive para o Cloudflare R2. Em vez de
+`upload_to_drive`, usa-se `download_*_to_r2()`: carrega cada PDF no bucket com o
+padrão de nome dos uploads do admin ("Aldi {Região} DD-MM-YYYY - DD-MM-YYYY.pdf"),
+para o `drive_producer` o processar com o MESMO extrator/normalização. Há 1 PDF
+por região; cada utilizador vê a sua (filtragem na app pelo distrito de /users/me).
 
-Mantém `AldiScraper`/`NoAldiStoreError` (usados pelo registry SCRAPERS em
-pipeline.py/scheduler.py).
+NOTA: o caminho leve (resolver região/URL) NÃO depende do framework de scrapers
+nem de Playwright/parsel/OCR — para `python scrapers/aldi.py --url-only` correr
+sem instalar nada. O adaptador `AldiScraper` (registry SCRAPERS) é opcional e só
+existe se o framework importar.
 """
 from __future__ import annotations
 
-# Em redes com inspeção TLS, confiar no cert store do SO (mesmo padrão do
-# drive_producer). Silencioso se o truststore não existir (ex.: CI sem interceção).
+import datetime as dt
+import logging
+import os
+import re
+import sys
+import unicodedata
+from pathlib import Path
+from typing import Optional
+from urllib.parse import urljoin
+
+# Permite correr como script (python scrapers/aldi.py …): põe a RAIZ do scraper
+# no sys.path, para encontrar config/, storage/, pdf_extractor (senão dá
+# "ModuleNotFoundError: No module named 'config'").
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
+# Rede com inspeção TLS: confiar no cert store do SO (silencioso se ausente).
 try:
     import truststore as _truststore
     _truststore.inject_into_ssl()
 except Exception:
     pass
 
-import datetime as dt
-import logging
-import os
-import re
-import unicodedata
-from pathlib import Path
-from typing import Optional
-from urllib.parse import urljoin
-
-from config.settings import settings
-from scrapers.base import FlyerWindow
-from scrapers.pdf_flyer import PdfFlyerScraper, REALISTIC_UA, flyers_dir
-
 logger = logging.getLogger(__name__)
 
 ALDI_BASE = "https://www.aldi.pt"
+REALISTIC_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
 
 
 class NoAldiStoreError(RuntimeError):
     """Não existe folheto Aldi para a região configurada (sem loja na zona)."""
 
 
-# --- mapa região --------------------------------------------------------------
-# Código de região do Aldi por DISTRITO (e algumas cidades comuns). Chaves
-# normalizadas (minúsculas, sem acentos) — ver `_norm`.
-#   n  Norte · c  Centro · l  Lisboa · a  Alentejo · g  Algarve
-#   ac Açores · md Madeira
-REGION_BY_AREA: dict[str, str] = {
+# --- 7 regiões do folheto Aldi -----------------------------------------------
+ALL_REGIONS = ("norte", "centro", "lisboa", "sul", "algarve", "acores", "madeira")
+
+REGION_LABEL = {
+    "norte": "Norte", "centro": "Centro", "lisboa": "Lisboa", "sul": "Sul",
+    "algarve": "Algarve", "acores": "Açores", "madeira": "Madeira",
+}
+
+# ⚠️ SLUG usado no URL .../folheto/esta-semana-{slug}.html.
+# É o ÚNICO sítio a corrigir se o site usar outra abreviatura. Confirmar ao vivo:
+#   python scrapers/aldi.py --url-only --region norte   (idem para cada região)
+REGION_SLUG = {
+    "norte": "n", "centro": "c", "lisboa": "l", "sul": "a",
+    "algarve": "g", "acores": "ac", "madeira": "md",
+}
+
+# Distrito (e ilhas) -> região. Cobre os 20 itens do dropdown do registo
+# (ver OnboardingScreen.DISTRITOS). Chaves normalizadas (ver `_norm`).
+REGION_BY_DISTRICT = {
     # Norte
-    "porto": "n", "braga": "n", "viana do castelo": "n", "vila real": "n",
-    "braganca": "n", "aveiro": "n",
+    "viana do castelo": "norte", "braga": "norte", "porto": "norte",
+    "vila real": "norte", "braganca": "norte",
     # Centro
-    "coimbra": "c", "leiria": "c", "castelo branco": "c", "guarda": "c",
+    "aveiro": "centro", "viseu": "centro", "guarda": "centro",
+    "coimbra": "centro", "leiria": "centro", "castelo branco": "centro",
     # Lisboa (e Vale do Tejo)
-    "lisboa": "l", "setubal": "l", "santarem": "l",
-    # Alentejo
-    "evora": "a", "beja": "a", "portalegre": "a",
+    "lisboa": "lisboa", "setubal": "lisboa", "santarem": "lisboa",
+    # Sul (Alentejo)
+    "portalegre": "sul", "evora": "sul", "beja": "sul",
     # Algarve
-    "faro": "g", "portimao": "g", "lagos": "g",
+    "faro": "algarve",
     # Açores
-    "ponta delgada": "ac", "angra do heroismo": "ac", "acores": "ac",
+    "r. a. acores": "acores", "acores": "acores",
+    "ponta delgada": "acores", "angra do heroismo": "acores",
     # Madeira
-    "funchal": "md", "madeira": "md",
+    "r. a. madeira": "madeira", "madeira": "madeira", "funchal": "madeira",
 }
 
 
@@ -81,18 +108,30 @@ def _norm(value: str) -> str:
     return "".join(c for c in nfkd if not unicodedata.combining(c))
 
 
-def region_code(district: str | None = None, city: str | None = None) -> str:
-    """Código de região Aldi a partir do distrito/cidade (cai nas settings).
+def _settings_zone() -> tuple[Optional[str], Optional[str]]:
+    """Distrito/cidade por omissão (settings; cai no env se settings indisponível)."""
+    try:
+        from config.settings import settings  # lazy
+        return settings.aldi_district, settings.aldi_city
+    except Exception:  # noqa: BLE001
+        return os.getenv("ALDI_DISTRICT"), os.getenv("ALDI_CITY")
 
-    Levanta NoAldiStoreError se a zona não estiver mapeada (ex.: sem loja Aldi).
-    """
-    for value in (district, city, settings.aldi_district, settings.aldi_city):
-        if value and _norm(value) in REGION_BY_AREA:
-            return REGION_BY_AREA[_norm(value)]
+
+def region_for(district: str | None = None, city: str | None = None) -> str:
+    """Região a partir do distrito/cidade (cai nas settings). NoAldiStoreError se não mapear."""
+    d_default, c_default = _settings_zone()
+    for value in (district, city, d_default, c_default):
+        if value and _norm(value) in REGION_BY_DISTRICT:
+            return REGION_BY_DISTRICT[_norm(value)]
     raise NoAldiStoreError(
-        f"Aldi: região desconhecida (distrito='{district or settings.aldi_district}', "
-        f"cidade='{city or settings.aldi_city}')"
+        f"Aldi: região desconhecida (distrito='{district or d_default}', "
+        f"cidade='{city or c_default}')"
     )
+
+
+def region_code(district: str | None = None, city: str | None = None) -> str:
+    """Slug de URL da região do distrito/cidade (esta-semana-{slug}.html)."""
+    return REGION_SLUG[region_for(district, city)]
 
 
 def current_week() -> int:
@@ -100,14 +139,25 @@ def current_week() -> int:
     return dt.date.today().isocalendar()[1]
 
 
-def week_flyer_url(code: str) -> str:
-    """URL da página do folheto da semana atual para a região `code`."""
-    return f"{ALDI_BASE}/folheto/esta-semana-{code}.html"
+def week_flyer_url(slug: str) -> str:
+    """URL da página do folheto da semana atual para o `slug` de região."""
+    return f"{ALDI_BASE}/folheto/esta-semana-{slug}.html"
 
 
 # --- HTTP (honra a flag de inspeção TLS, como o resto do projeto) -------------
 def _verify_tls() -> bool:
     return os.getenv("FOLHETO_INSECURE_TLS", "0") != "1"
+
+
+def _flyers_dir() -> Path:
+    try:
+        from config.settings import settings  # lazy
+        base = settings.data_dir
+    except Exception:  # noqa: BLE001
+        base = os.getenv("SCRAPER_DATA_DIR", "data")
+    path = Path(base) / "folhetos"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def _session():
@@ -118,10 +168,21 @@ def _session():
 
 
 def _find_pdf_url(html: str, base_url: str) -> Optional[str]:
-    """Link do PDF na página (botão "Descarregar" / GetPDF.ashx / *.pdf).
+    """Link do PDF a partir do HTML da página do folheto.
 
-    Usa BeautifulSoup quando disponível; caso contrário, regex (sem dependência).
+    O site é Next.js: a base do folheto (`folhetos.aldi.pt/AAAA/sNN/<nome>/`) vem
+    no blob `__NEXT_DATA__`, e o PDF descarrega-se em `{base}/GetPDF.ashx`
+    (verificado ao vivo). Fallback: link de download clássico (bs4/regex).
     """
+    # 1) Mecanismo real: base do folheto no JSON do Next.js -> GetPDF.ashx.
+    bases = re.findall(r"https?://folhetos\.aldi\.pt/[A-Za-z0-9_./-]+", html)
+    if bases:
+        base = sorted(set(bases), key=len, reverse=True)[0].rstrip("/")
+        if base.lower().endswith(("getpdf.ashx", ".pdf")):
+            return base
+        return base + "/GetPDF.ashx"
+
+    # 2) Fallback: botão "Descarregar"/GetPDF/.pdf num <a href> clássico.
     hrefs: list[str] = []
     try:
         from bs4 import BeautifulSoup  # lazy/opcional
@@ -143,41 +204,68 @@ def _find_pdf_url(html: str, base_url: str) -> Optional[str]:
 
     if not hrefs:
         return None
-    # Prefere o GetPDF.ashx (o "Descarregar" oficial) ao primeiro .pdf qualquer.
     hrefs.sort(key=lambda h: 0 if "getpdf" in h.lower() else 1)
     return urljoin(base_url, hrefs[0])
 
 
-def _resolve_pdf_url(district: str | None, city: str | None) -> str:
-    code = region_code(district, city)
-    page_url = week_flyer_url(code)
-    logger.info("Aldi: região '%s' (semana %d) — %s", code, current_week(), page_url)
-    resp = _session().get(page_url, verify=_verify_tls(), timeout=30)
-    resp.raise_for_status()
-    pdf_url = _find_pdf_url(resp.text, page_url)
-    if not pdf_url:
-        raise RuntimeError(f"Aldi: sem link de PDF na página {page_url}")
-    return pdf_url
+# Slug do folheto NACIONAL — o único que existe sempre. Os slugs regionais
+# (esta-semana-c/l/a/g/…) só existem nas semanas em que há folheto regional;
+# fora disso a resolução cai aqui (verificado: na semana 26/2026 só havia 'n').
+NATIONAL_SLUG = "n"
 
 
-def download_pdf(district: str | None = None, city: str | None = None) -> Path:
-    """Descarrega o PDF do folheto Aldi da semana atual para data/folhetos/."""
-    pdf_url = _resolve_pdf_url(district, city)
+def resolve_pdf_url(slug: str) -> str:
+    """URL do PDF do folheto da semana atual para o `slug`, com fallback nacional.
+
+    Se a página regional não existir (404) ou não tiver folheto, usa o nacional.
+    """
+    candidates = list(dict.fromkeys([slug, NATIONAL_SLUG]))  # sem repetir
+    for s_try in candidates:
+        page_url = week_flyer_url(s_try)
+        logger.info("Aldi: slug '%s' (semana %d) — %s", s_try, current_week(), page_url)
+        resp = _session().get(page_url, verify=_verify_tls(), timeout=30)
+        if resp.status_code == 404:
+            logger.info("Aldi: %s não existe (404) — fallback nacional", page_url)
+            continue
+        resp.raise_for_status()
+        pdf_url = _find_pdf_url(resp.text, page_url)
+        if pdf_url:
+            if s_try != slug:
+                logger.info("Aldi: região '%s' sem folheto próprio — usei o nacional", slug)
+            return pdf_url
+    raise RuntimeError(f"Aldi: sem folheto disponível (tentei {candidates})")
+
+
+def _download_for_slug(slug: str, name: str) -> Path:
+    """Descarrega o PDF da região `slug` para data/folhetos/aldi_{name}_{data}.pdf."""
+    pdf_url = resolve_pdf_url(slug)
     logger.info("Aldi: a descarregar PDF — %s", pdf_url)
     resp = _session().get(pdf_url, verify=_verify_tls(), timeout=120)
     resp.raise_for_status()
     body = resp.content
-    if not body[:4] == b"%PDF":
+    if body[:4] != b"%PDF":
         raise RuntimeError(f"Aldi: o URL não devolveu um PDF — {pdf_url}")
-    code = region_code(district, city)
-    target = flyers_dir() / f"aldi_{code}_{dt.date.today().isoformat()}.pdf"
+    target = _flyers_dir() / f"aldi_{name}_{dt.date.today().isoformat()}.pdf"
     target.write_bytes(body)
     logger.info("Aldi: PDF guardado em %s (%d bytes)", target, len(body))
     return target
 
 
+def download_pdf(district: str | None = None, city: str | None = None) -> Path:
+    """Descarrega o folheto Aldi da região do distrito/cidade (semana atual)."""
+    region = region_for(district, city)
+    return _download_for_slug(REGION_SLUG[region], region)
+
+
+def download_region_pdf(region: str) -> Path:
+    """Descarrega o folheto de uma região específica (ver ALL_REGIONS)."""
+    if region not in REGION_SLUG:
+        raise ValueError(f"Região inválida: {region!r} (use {', '.join(ALL_REGIONS)})")
+    return _download_for_slug(REGION_SLUG[region], region)
+
+
 def fetch_products(district: str | None = None, city: str | None = None) -> list[dict]:
-    """Descarrega o folheto e extrai os produtos com o extrator do projeto."""
+    """Descarrega o folheto da região e extrai os produtos com o extrator do projeto."""
     pdf = download_pdf(district, city)
     from pdf_extractor import extract_products_from_pdf  # lazy: só aqui gasta IA
     produtos = extract_products_from_pdf(str(pdf), "Aldi")
@@ -185,61 +273,71 @@ def fetch_products(district: str | None = None, city: str | None = None) -> list
     return produtos
 
 
-def download_to_r2(district: str | None = None, city: str | None = None) -> str:
-    """Descarrega o folheto e carrega-o no R2 com o padrão de nome do admin.
+# --- integração R2 (substitui o antigo upload_to_drive) -----------------------
+def _current_window() -> tuple[dt.date, dt.date]:
+    """Janela do folheto desta semana (quinta a quarta, ciclo típico PT)."""
+    today = dt.date.today()
+    thursday = today - dt.timedelta(days=(today.weekday() - 3) % 7)
+    return thursday, thursday + dt.timedelta(days=6)
 
-    Devolve a key no bucket. O `drive_producer` apanha-o na próxima passagem e
-    extrai/normaliza com o MESMO pipeline dos uploads manuais.
-    """
+
+def _flyer_key(region: str) -> str:
+    """Nome do PDF no R2: 'Aldi {Região} DD-MM-YYYY - DD-MM-YYYY.pdf'."""
+    valid_from, valid_until = _current_window()
+    return f"Aldi {REGION_LABEL[region]} {valid_from:%d-%m-%Y} - {valid_until:%d-%m-%Y}.pdf"
+
+
+def download_region_to_r2(region: str) -> str:
+    """Descarrega o folheto de uma região e carrega-o no R2. Devolve a key."""
     from storage.r2_storage import r2_storage  # lazy
     if not r2_storage.is_configured():
         raise RuntimeError("Aldi: R2 não configurado (R2_ENDPOINT/BUCKET/keys)")
-    pdf = download_pdf(district, city)
-    w: FlyerWindow = FlyerWindow.current_week()
-    key = f"Aldi {w.valid_from:%d-%m-%Y} - {w.valid_until:%d-%m-%Y}.pdf"
+    pdf = download_region_pdf(region)
+    key = _flyer_key(region)
     r2_storage.upload_pdf(key, pdf)
-    logger.info("Aldi: folheto no R2 como '%s'", key)
+    logger.info("Aldi: folheto de %s no R2 como '%s'", REGION_LABEL[region], key)
     return key
 
 
-# --- compatibilidade com o framework de scrapers (registry SCRAPERS) ----------
-class AldiScraper(PdfFlyerScraper):
-    """Adapta o mecanismo acima ao contrato BaseScraper/PdfFlyerScraper.
+def download_all_regions_to_r2() -> dict[str, str]:
+    """Carrega no R2 o folheto das 7 regiões. Best-effort: regista falhas e segue.
 
-    `download_flyer` ignora a navegação Playwright e usa o URL regional direto
-    (mais robusto). Sem região mapeada → NoAldiStoreError (o pipeline marca
-    flyer_available=false).
+    Devolve {região: key} das que correram bem (uma região pode falhar sem
+    bloquear as outras — ex.: sem folheto nas ilhas numa dada semana).
     """
-
-    slug = "aldi"
-    name = "Aldi"
-    start_url = ALDI_BASE + "/folhetosaldi.html"
-
-    def __init__(self, *, district: str | None = None, city: str | None = None, **kwargs):
-        super().__init__(**kwargs)
-        self.district = district or settings.aldi_district
-        self.city = city or settings.aldi_city
-
-    def download_flyer(self, page, context) -> Optional[Path]:
-        # Resolve e descarrega sem depender dos dropdowns do site.
-        return download_pdf(self.district, self.city)
+    done: dict[str, str] = {}
+    for region in ALL_REGIONS:
+        try:
+            done[region] = download_region_to_r2(region)
+        except Exception as exc:  # noqa: BLE001 — não bloquear as restantes regiões
+            logger.warning("Aldi: região %s falhou — %s", REGION_LABEL[region], exc)
+    logger.info("Aldi: %d/%d regiões carregadas no R2", len(done), len(ALL_REGIONS))
+    return done
 
 
-if __name__ == "__main__":  # teste manual: python scrapers/aldi.py --district Porto
+if __name__ == "__main__":  # teste manual
     import argparse
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    ap = argparse.ArgumentParser(description="Folheto Aldi da semana atual")
-    ap.add_argument("--district")
-    ap.add_argument("--city")
-    ap.add_argument("--r2", action="store_true", help="carrega o PDF no R2 (pipeline)")
-    ap.add_argument("--url-only", action="store_true", help="só resolve o URL do PDF")
+    ap = argparse.ArgumentParser(description="Folheto Aldi da semana atual (7 regiões)")
+    ap.add_argument("--region", choices=ALL_REGIONS, help="região específica")
+    ap.add_argument("--district", help="distrito (deriva a região)")
+    ap.add_argument("--city", help="cidade (deriva a região)")
+    ap.add_argument("--url-only", action="store_true", help="só resolve o URL do PDF (testar slug)")
+    ap.add_argument("--r2", action="store_true", help="carrega o PDF da região no R2")
+    ap.add_argument("--all-regions", action="store_true", help="carrega as 7 regiões no R2")
     args = ap.parse_args()
 
-    if args.url_only:
-        print(_resolve_pdf_url(args.district, args.city))
+    if args.all_regions:
+        print("R2:", download_all_regions_to_r2())
+    elif args.url_only:
+        slug = REGION_SLUG[args.region] if args.region else region_code(args.district, args.city)
+        print(resolve_pdf_url(slug))
     elif args.r2:
-        print("R2 key:", download_to_r2(args.district, args.city))
+        region = args.region or region_for(args.district, args.city)
+        print("R2 key:", download_region_to_r2(region))
+    elif args.region:
+        print("PDF:", download_region_pdf(args.region))
     else:
         prods = fetch_products(args.district, args.city)
         print(f"{len(prods)} produtos extraídos")

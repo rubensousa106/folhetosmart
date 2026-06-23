@@ -51,18 +51,11 @@ folheto:
   security:
     # Em produção: true (rejeita HTTP). Em dev local: false.
     require-https: ${FOLHETO_REQUIRE_HTTPS:false}
-  scraper:
-    # URL do worker Python que corre o pipeline de scraping + IA.
-    url: ${FOLHETO_SCRAPER_URL:http://localhost:8090}
   admin:
     # Conta de administrador criada/promovida no arranque (ver AdminBootstrap).
     # No Render define-se no painel; em dev local fica vazio.
     email: ${FOLHETO_ADMIN_EMAIL:}
     password: ${FOLHETO_ADMIN_PASSWORD:}
-  scheduler:
-    # Cron semanal interno (SyncSchedulerJob). No Render (free) põe-se false —
-    # o processamento semanal corre no GitHub Actions. Local/docker: true.
-    enabled: ${FOLHETO_SCHEDULER_ENABLED:true}
 
 # ============================================================
 # ACTUATOR - Health Check para o Render

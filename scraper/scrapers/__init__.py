@@ -1,28 +1,21 @@
-"""Scrapers por supermercado."""
-from .aldi import AldiScraper, NoAldiStoreError
-from .base import BaseScraper, FlyerWindow
-from .continente import ContinenteScraper
-from .intermarche import IntermarcheScraper
-from .lidl import LidlScraper
-from .pingodoce import PingoDoceScraper
+"""Scrapers de folhetos.
 
-# Registo slug -> classe de scraper (os 5 supermercados suportados).
-SCRAPERS: dict[str, type[BaseScraper]] = {
-    LidlScraper.slug: LidlScraper,
-    ContinenteScraper.slug: ContinenteScraper,
-    PingoDoceScraper.slug: PingoDoceScraper,
-    IntermarcheScraper.slug: IntermarcheScraper,
-    AldiScraper.slug: AldiScraper,
-}
+Atualmente só o **Aldi** tem scraper próprio (folheto regional/nacional descarregado
+do site). Os outros supermercados entram via upload manual de PDF para o R2 (admin),
+que o `drive_producer` depois processa com o mesmo extrator.
+"""
+from .aldi import (
+    NoAldiStoreError,
+    download_all_regions_to_r2,
+    download_region_to_r2,
+    fetch_products,
+    region_for,
+)
 
 __all__ = [
-    "AldiScraper",
-    "BaseScraper",
-    "ContinenteScraper",
-    "FlyerWindow",
-    "IntermarcheScraper",
-    "LidlScraper",
     "NoAldiStoreError",
-    "PingoDoceScraper",
-    "SCRAPERS",
+    "download_all_regions_to_r2",
+    "download_region_to_r2",
+    "fetch_products",
+    "region_for",
 ]

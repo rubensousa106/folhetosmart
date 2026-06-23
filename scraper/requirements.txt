@@ -1,41 +1,27 @@
-# --- IA de matching (núcleo) ---
+# FolhetoSmart — produtor de folhetos.
+# Modelo "extrai 1x/semana no servidor, a app lê N x" via Cloudflare R2.
+# Dependências do pipeline atual: drive_producer + normalize_products + rotate_r2 + aldi.
+
+# --- Extração de produtos (PDF -> texto -> Claude) ---
 anthropic>=0.40.0
-sentence-transformers>=3.0.0      # fallback local quando a Claude API falha
+pdfplumber>=0.11
 
-# --- Scraping ---
-anthropic
-sentence-transformers
-scrapy
-playwright
-pytesseract
-pdf2image
-Pillow
-opencv-python-headless
-numpy
-pdfplumber
-google-api-python-client
-google-auth-oauthlib
-google-auth-httplib2
-requests
-beautifulsoup4                    # descoberta do link do PDF no site do Aldi
+# --- HTTP / scraping do folheto Aldi ---
+requests>=2.31
+beautifulsoup4>=4.12              # descoberta do link do PDF no site do Aldi
+httpx>=0.27                       # envio das notificações FCM (HTTP v1)
 
-# --- Cloudflare R2 (armazenamento de folhetos + JSON; ver storage/r2_storage.py) ---
-boto3>=1.34                       # cliente S3-compatível do R2
-truststore>=0.9                   # confia no cert store do SO (redes com inspeção TLS)
+# --- Cloudflare R2 (S3-compatível): folhetos PDF + feed JSON ---
+boto3>=1.34
 
-# --- Google Drive (salvaguarda de folhetos PDF) ---
-google-api-python-client>=2.130
-google-auth-httplib2>=0.2
-google-auth-oauthlib>=1.2
-
-# --- Base de dados / worker ---
+# --- Base de dados (só leitura dos tokens FCM em notifications/) ---
 psycopg[binary]>=3.1
-fastapi>=0.110                    # worker HTTP chamado pelo backend
-uvicorn[standard]>=0.29
-python-multipart>=0.0.9           # multipart/form-data (upload de PDF, Fix 3)
-pydantic>=2.6
-python-dotenv>=1.0
-schedule>=1.2                     # cron simples (scheduler.py)
 
-# --- Testes ---
+# --- Firebase Cloud Messaging: token de acesso da service account ---
+google-auth>=2.30
+
+# --- Redes com inspeção TLS (dev): confiar no cert store do SO ---
+truststore>=0.9
+
+# --- Testes / smoke do extrator ---
 pytest>=8.0

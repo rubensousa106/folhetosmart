@@ -33,23 +33,31 @@ services:
         condition: service_healthy
     environment:
       # BD local: o container "postgres" deste compose (NUNCA a BD do Render).
-      # As credenciais vêm do .env (mesmas do serviço postgres acima).
-      SPRING_DATASOURCE_URL: jdbc:postgresql://dpg-d8o0vl8k1i2s73dpean0-a/folhetosmart
-      SPRING_DATASOURCE_USERNAME: folhetosmart_user
-      SPRING_DATASOURCE_PASSWORD: lwWwXxuxTX86oukR4qGgLlrEcq3g6v2S
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-folhetosmart}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-folheto}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-folheto}
       FOLHETO_JWT_SECRET: ${FOLHETO_JWT_SECRET}
-      FOLHETO_SCRAPER_URL: http://scraper:8090
       # Conta de administrador criada no arranque (endpoints só-ADMIN).
       FOLHETO_ADMIN_EMAIL: ${FOLHETO_ADMIN_EMAIL:-}
       FOLHETO_ADMIN_PASSWORD: ${FOLHETO_ADMIN_PASSWORD:-}
+      # R2: o backend assina os URLs de upload de folhetos (flyer-upload-url).
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_BUCKET: ${R2_BUCKET:-folhetosmart}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
     ports:
       - "8080:8080"
 
+  # Produtor de folhetos (on-demand, não fica sempre a correr). Usa-se com:
+  #   docker compose run --rm scraper python drive_producer.py
+  #   docker compose run --rm scraper python normalize_products.py
+  #   docker compose run --rm scraper python rotate_r2.py
   scraper:
     build:
       context: ./scraper
       dockerfile: Dockerfile
     container_name: folhetosmart-scraper
+    profiles: ["tools"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,60 +65,18 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
       DATABASE_URL: postgresql://${POSTGRES_USER:-folheto}:${POSTGRES_PASSWORD:-folheto}@postgres:5432/${POSTGRES_DB:-folhetosmart}
-      WORKER_PORT: "8090"
-      ALDI_DISTRICT: ${ALDI_DISTRICT:-Lisboa}
-      ALDI_CITY: ${ALDI_CITY:-Lisboa}
-      GOOGLE_DRIVE_FOLDER_ID: ${GOOGLE_DRIVE_FOLDER_ID:-}
-      GOOGLE_DRIVE_CREDENTIALS_PATH: ${GOOGLE_DRIVE_CREDENTIALS_PATH:-}
+      # Cloudflare R2 — origem dos PDFs e destino do feed normalizado.
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_BUCKET: ${R2_BUCKET:-folhetosmart}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      FOLHETO_BACKEND_URL: ${FOLHETO_BACKEND_URL:-http://backend:8080}
+      FOLHETO_ADMIN_EMAIL: ${FOLHETO_ADMIN_EMAIL:-}
+      FOLHETO_ADMIN_PASSWORD: ${FOLHETO_ADMIN_PASSWORD:-}
       FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
-      FCM_CREDENTIALS_PATH: ${FCM_CREDENTIALS_PATH:-}
+      FCM_CREDENTIALS_JSON: ${FCM_CREDENTIALS_JSON:-}
       # Rede com inspeção TLS (apenas dev — nunca em produção).
       FOLHETO_INSECURE_TLS: ${FOLHETO_INSECURE_TLS:-0}
-    volumes:
-      # Credenciais Google Drive / FCM (não vão para o git).
-      - ./scraper/credentials:/app/credentials:ro
-    ports:
-      - "8090:8090"
-
-  # Vigia a pasta do Google Drive e processa PDFs novos automaticamente
-  # (espera 2 min após o upload). Corre o pipeline IN-PROCESS — não chama o
-  # worker HTTP — por isso precisa das mesmas credenciais que o scraper.
-  drive-scheduler:
-    build:
-      context: ./scraper
-      dockerfile: Dockerfile
-    container_name: folhetosmart-drive-scheduler
-    command: python scheduler_drive.py
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-folheto}:${POSTGRES_PASSWORD:-folheto}@postgres:5432/${POSTGRES_DB:-folhetosmart}
-      GOOGLE_DRIVE_FOLDER_ID: ${GOOGLE_DRIVE_FOLDER_ID:-}
-      GOOGLE_DRIVE_CREDENTIALS_PATH: ${GOOGLE_DRIVE_CREDENTIALS_PATH:-}
-      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
-      FCM_CREDENTIALS_PATH: ${FCM_CREDENTIALS_PATH:-}
-      # Rede com inspeção TLS (apenas dev — nunca em produção).
-      FOLHETO_INSECURE_TLS: ${FOLHETO_INSECURE_TLS:-0}
-    volumes:
-      - ./scraper/credentials:/app/credentials:ro
-    restart: unless-stopped
-
-  nginx:
-    image: nginx:alpine
-    container_name: folhetosmart-nginx
-    profiles: ["prod"]             # produção: docker compose --profile prod up -d
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./deploy/hetzner/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-    depends_on:
-      - backend
-    restart: unless-stopped
 
   pgadmin:
     image: dpage/pgadmin4:8

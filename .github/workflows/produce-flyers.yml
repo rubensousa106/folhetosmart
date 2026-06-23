@@ -1,18 +1,16 @@
-name: Produzir folhetos (Drive -> backend)
+name: Produzir folhetos (R2 -> backend -> feed)
 
-# Modelo simples "analisar 1x, ler Nx": descarrega os PDFs da pasta do Drive,
-# extrai os produtos com a Claude (pdf_extractor, pagina-a-pagina) e faz POST do
-# JSON para o backend (Postgres do Render). A app le em /api/v1/products/latest.
-#
-# Corre no GitHub Actions (e nao no Render) porque a extracao precisa de mais
-# RAM/tempo do que o plano gratis do Render oferece. A flag "analisar 1x" e
-# DURAVEL no backend: se o folheto ja foi analisado, o produtor salta (0 EUR).
+# Modelo "analisar 1x, ler Nx": extrai os PDFs do bucket Cloudflare R2 com a
+# Claude (pdf_extractor, pagina-a-pagina), faz POST do JSON para o backend,
+# normaliza os produtos e publica o feed normalizado de volta no R2. A app le-o
+# via GET /api/v1/products/all. Corre no GitHub Actions (e nao no Render) porque
+# a extracao precisa de mais RAM/tempo do que o plano gratis do Render oferece.
 
 on:
   schedule:
-    # Quinta-feira 09:00 UTC (~10:00 em Lisboa). Ajusta se necessario.
+    # Quinta-feira 09:00 UTC (~10:00 em Lisboa).
     - cron: "0 9 * * 4"
-  workflow_dispatch:        # disparo manual no GitHub OU via n8n (Drive Trigger)
+  workflow_dispatch:        # disparo manual no GitHub OU via n8n
     inputs:
       supermarket:
         description: "So este supermercado (vazio = todos)"
@@ -39,24 +37,31 @@ jobs:
       - name: Construir a imagem do scraper
         run: docker build -t folhetosmart-scraper ./scraper
 
-      - name: Produzir (extrai com IA + POST para o backend)
+      - name: Extrair (IA) + POST + normalizar + publicar o feed no R2
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-sonnet-4-6' }}
-          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
-          GOOGLE_DRIVE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS_JSON }}
-          # Backend (Postgres do Render) — destino do POST do produtor.
+          # Cloudflare R2 — origem dos PDFs e destino do feed normalizado.
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ vars.R2_BUCKET || 'folhetosmart' }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          # Backend (Postgres do Render) — destino do POST do produtor + feed-url.
           FOLHETO_BACKEND_URL: ${{ vars.FOLHETO_BACKEND_URL || 'https://folhetosmart.onrender.com' }}
           FOLHETO_ADMIN_EMAIL: ${{ secrets.FOLHETO_ADMIN_EMAIL }}
           FOLHETO_ADMIN_PASSWORD: ${{ secrets.FOLHETO_ADMIN_PASSWORD }}
+          # Notificacoes FCM (opcional) aos utilizadores quando ha feed novo.
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          FCM_PROJECT_ID: ${{ secrets.FCM_PROJECT_ID }}
+          FCM_CREDENTIALS_JSON: ${{ secrets.FCM_CREDENTIALS_JSON }}
           FOLHETO_FORCE: ${{ inputs.force || '0' }}
           ALVO: ${{ inputs.supermarket }}
         run: |
           docker run --rm \
-            -e ANTHROPIC_API_KEY \
-            -e ANTHROPIC_MODEL \
-            -e GOOGLE_DRIVE_FOLDER_ID -e GOOGLE_DRIVE_CREDENTIALS_JSON \
+            -e ANTHROPIC_API_KEY -e ANTHROPIC_MODEL \
+            -e R2_ENDPOINT -e R2_BUCKET -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY \
             -e FOLHETO_BACKEND_URL -e FOLHETO_ADMIN_EMAIL -e FOLHETO_ADMIN_PASSWORD \
+            -e DATABASE_URL -e FCM_PROJECT_ID -e FCM_CREDENTIALS_JSON \
             -e FOLHETO_FORCE \
             folhetosmart-scraper \
-            python drive_producer.py ${ALVO}
+            sh -c "python drive_producer.py ${ALVO} && python normalize_products.py && python rotate_r2.py"

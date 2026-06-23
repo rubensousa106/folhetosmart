@@ -1,11 +1,14 @@
 # =====================================================================
 # Blueprint do FolhetoSmart para o plano GRATUITO do Render.
 #
-# Sobe a API de leitura (backend Spring Boot) + PostgreSQL. O processamento
-# semanal pesado (scraping Playwright + OCR/visão) NÃO corre aqui: corre no
-# GitHub Actions (.github/workflows/weekly-sync.yml), porque o worker não cabe
-# nos 512 MB de RAM do plano grátis. Mantém-se o modelo "processar 1×/semana
-# no servidor (CI), ler N× pelos utilizadores".
+# Sobe a API (backend Spring Boot) + PostgreSQL. A extração semanal dos folhetos
+# corre no GitHub Actions (.github/workflows/produce-flyers.yml) — e não aqui —
+# porque precisa de mais RAM/tempo do que os 512 MB do plano grátis. Mantém-se o
+# modelo "processar 1×/semana no servidor (CI), ler N× pelos utilizadores".
+#
+# NOTA: o runtime/buildCommand abaixo (Python/Tesseract) está desatualizado — o
+# backend é Java/Spring Boot (backend/Dockerfile). O deploy real está configurado
+# no painel do Render; rever este blueprint se voltar a usar deploy por Blueprint.
 #
 # Limitações do plano grátis (ver deploy/render/README.md):
 #   - o web service adormece após 15 min sem tráfego (1.º pedido é lento);
@@ -47,9 +50,16 @@ services:
       - key: FOLHETO_ADMIN_PASSWORD
         sync: false
 
-      # --- Scheduler interno OFF: quem processa é o GitHub Actions ---
-      - key: FOLHETO_SCHEDULER_ENABLED
-        value: "false"
+      # --- Cloudflare R2: o backend assina os URLs de upload de folhetos
+      #     (POST /api/v1/admin/flyer-upload-url). Sem isto devolve 503. ---
+      - key: R2_ENDPOINT
+        sync: false
+      - key: R2_BUCKET
+        value: folhetosmart
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
 
       # --- JVM dentro dos 512 MB do plano grátis ---
       - key: JAVA_TOOL_OPTIONS

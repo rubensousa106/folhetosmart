@@ -49,19 +49,16 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Públicos
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        // Dados de preços/comparação — NEGÓCIO PRIVADO: só
-                        // utilizadores autenticados (a app envia sempre o JWT).
-                        // Evita que concorrentes "raspem" a base de comparação.
+                        // Dados dos folhetos — NEGÓCIO PRIVADO: só utilizadores
+                        // autenticados (a app envia sempre o JWT). Evita que
+                        // concorrentes "raspem" a base de comparação.
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/**").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/promotions").authenticated()
-                        .requestMatchers("/api/v1/compare").authenticated()
-                        .requestMatchers("/api/v1/shopping-list/**").permitAll()
                         // Leitura do estado/progresso é pública (a app só lê).
                         .requestMatchers(HttpMethod.GET, "/api/v1/sync/status").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/sync/runs/**").permitAll()
                         .requestMatchers("/actuator/health", "/error").permitAll()
-                        // Disparar processamento (Claude API) é só ADMIN —
-                        // @PreAuthorize nos métodos garante o papel.
+                        // Restante de /sync (ex.: marcar disponibilidade) é só ADMIN
+                        // (@PreAuthorize nos métodos garante o papel).
                         .requestMatchers("/api/v1/sync/**").authenticated()
                         // Painel de administração — só ADMIN (@PreAuthorize de classe).
                         .requestMatchers("/api/v1/admin/**").authenticated()
