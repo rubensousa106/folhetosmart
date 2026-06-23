@@ -160,14 +160,26 @@ data class ConsentRequest(
 data class UserMeDto(
     val id: String,
     val email: String,
+    val name: String? = null,
     val role: String,
     val district: String? = null,
     val city: String? = null
 )
 
 data class UpdateMeRequest(
+    val name: String? = null,
     val district: String? = null,
     val city: String? = null
+)
+
+data class ChangePasswordRequest(
+    val currentPassword: String,
+    val newPassword: String
+)
+
+data class ChangeEmailRequest(
+    val currentPassword: String,
+    val newEmail: String
 )
 
 // --- Alertas ---------------------------------------------------------------

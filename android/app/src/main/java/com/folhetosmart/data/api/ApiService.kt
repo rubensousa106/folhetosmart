@@ -54,6 +54,18 @@ interface ApiService {
         @Body request: UpdateMeRequest
     ): UserMeDto
 
+    @PUT("api/v1/users/me/password")
+    suspend fun changePassword(
+        @Header("Authorization") bearer: String,
+        @Body request: ChangePasswordRequest
+    )
+
+    @PUT("api/v1/users/me/email")
+    suspend fun changeEmail(
+        @Header("Authorization") bearer: String,
+        @Body request: ChangeEmailRequest
+    ): AuthResponse
+
     // --- Autenticação ---
     @POST("api/v1/auth/login")
     suspend fun login(@Body request: LoginRequest): AuthResponse

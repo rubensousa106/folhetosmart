@@ -2,8 +2,11 @@ package com.folhetosmart.auth.dto;
 
 import jakarta.validation.constraints.Size;
 
-/** PUT /api/v1/users/me — atualiza a localização (folheto regional Aldi). */
+/** PUT /api/v1/users/me — atualiza nome + localização (folheto regional Aldi). */
 public record UpdateMeRequest(
+        @Size(max = 100, message = "Nome demasiado longo")
+        String name,
+
         @Size(max = 50, message = "Distrito demasiado longo")
         String district,
 

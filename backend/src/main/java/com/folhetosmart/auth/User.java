@@ -33,6 +33,9 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    /** Nome do utilizador (opcional; editável no perfil em Definições). */
+    private String name;
+
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 

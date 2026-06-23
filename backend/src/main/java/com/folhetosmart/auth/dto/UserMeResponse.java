@@ -8,6 +8,7 @@ import java.util.UUID;
 public record UserMeResponse(
         UUID id,
         String email,
+        String name,
         String role,
         String district,
         String city
@@ -16,6 +17,7 @@ public record UserMeResponse(
         return new UserMeResponse(
                 user.getId(),
                 user.getEmail(),
+                user.getName(),
                 user.getRole().name(),
                 user.getDistrict(),
                 user.getCity());

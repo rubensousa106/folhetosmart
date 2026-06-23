@@ -42,14 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.folhetosmart.features.legal.PrivacyPolicyScreen
 import com.folhetosmart.features.legal.TermsOfServiceScreen
-
-/** Distritos para o folheto regional do Aldi (escolha manual, sem GPS). */
-private val DISTRITOS = listOf(
-    "Aveiro", "Beja", "Braga", "Bragança", "Castelo Branco", "Coimbra",
-    "Évora", "Faro", "Guarda", "Leiria", "Lisboa", "Portalegre", "Porto",
-    "Santarém", "Setúbal", "Viana do Castelo", "Vila Real", "Viseu",
-    "R. A. Madeira", "R. A. Açores"
-)
+import com.folhetosmart.ui.DISTRITOS_PT
 
 /**
  * Registo em 2 passos (Fix 1):
@@ -298,7 +291,7 @@ private fun LocationStep(
                     .menuAnchor()
             )
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                DISTRITOS.forEach { option ->
+                DISTRITOS_PT.forEach { option ->
                     DropdownMenuItem(
                         text = { Text(option) },
                         onClick = {
