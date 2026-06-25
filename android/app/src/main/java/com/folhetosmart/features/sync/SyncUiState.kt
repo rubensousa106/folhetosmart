@@ -14,6 +14,7 @@ sealed interface SyncUiState {
         val productCount: Int,
         val validityLabel: String,         // "16/06 a 22/06/2026"
         val lastCheckedLabel: String?,     // "14:32"
+        val lastSyncDate: String,       // "2026-06-16T14:32:00Z" (para comparar com o servidor)
         val checking: Boolean = false,
         val errorMessage: String? = null
     ) : SyncUiState

@@ -122,6 +122,6 @@ class CompareRepository(
     private companion object {
         const val KEY_ALL = "all_offerings"
         const val KEY_SYNCED_FEEDS = "synced_feed_keys"  // feeds da última sincronização
-        const val FRESH_MS = 12 * 60 * 60 * 1000L  // 12h — descarrega 1x e usa offline
+        const val FRESH_MS = 7 * 24 * 60 * 1000L  // 7 dias — descarrega 1x e usa offline
     }
 }
