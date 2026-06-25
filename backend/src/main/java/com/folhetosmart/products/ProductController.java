@@ -7,7 +7,7 @@ import com.folhetosmart.prices.dto.PriceHistoryPointDto;
 import com.folhetosmart.prices.dto.ProductPriceDto;
 import com.folhetosmart.products.dto.FlyerOfferingDto;
 import com.folhetosmart.products.dto.ProductDto;
-import com.folhetosmart.storage.R2Service;
+import com.folhetosmart.sync.R2Service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
