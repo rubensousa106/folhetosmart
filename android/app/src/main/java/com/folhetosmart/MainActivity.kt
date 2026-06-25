@@ -19,6 +19,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val container = (application as FolhetoSmartApp).container
+        // Destino vindo de uma notificação push (ex.: "novos produtos" → "sync").
+        val startRoute = intent?.getStringExtra(EXTRA_OPEN_ROUTE)
 
         setContent {
             FolhetoSmartTheme {
@@ -33,6 +35,7 @@ class MainActivity : ComponentActivity() {
                     FolhetoSmartRoot(
                         // O separador Admin só aparece para role ADMIN (Fix 2).
                         isAdmin = container.tokenStore.isAdmin,
+                        startRoute = startRoute,
                         onLogout = {
                             // Limpa token + dados locais (lista + cache) e volta
                             // ao Login. Sem sessão não se vê nem se mexe em nada.
@@ -47,5 +50,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    companion object {
+        /** Extra do intent: rota a abrir vinda de uma notificação push (ex.: "sync"). */
+        const val EXTRA_OPEN_ROUTE = "open_route"
     }
 }

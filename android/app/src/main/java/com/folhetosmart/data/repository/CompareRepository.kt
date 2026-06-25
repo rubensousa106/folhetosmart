@@ -48,7 +48,7 @@ class CompareRepository(
         if (urls.isEmpty()) {
             return api.getAllFlyerProducts()  // compat: endpoint único (302 -> R2)
         }
-        return urls.flatMap { url ->
+        val merged = urls.flatMap { url ->
             try {
                 api.downloadFeed(url)
             } catch (e: CancellationException) {
@@ -57,6 +57,47 @@ class CompareRepository(
                 emptyList()  // um feed em falta não trava os outros
             }
         }
+        // Marca estes feeds como sincronizados — serve para detetar futuros feeds
+        // novos no servidor (auto-sincronização + alerta "novos produtos").
+        markFeedsSynced(feedKeys(urls))
+        return merged
+    }
+
+    /**
+     * Há no servidor algum feed DIFERENTE do último sincronizado? (= produtos
+     * novos publicados que a app ainda não trouxe). Compara o conjunto de nomes
+     * de ficheiro dos feeds ativos com o conjunto guardado na última sincronização.
+     */
+    suspend fun hasNewerFeed(): Boolean {
+        val server = try {
+            feedKeys(api.getFeeds())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return false  // sem ligação: não inventamos novidades
+        }
+        return server.isNotEmpty() && server != syncedFeedKeys()
+    }
+
+    /** Nome de ficheiro de cada feed (ex.: "produtos_22-06-2026_28-06-2026.json"),
+     *  ignorando a query da assinatura do R2. Ordenado para comparar como conjunto. */
+    private fun feedKeys(urls: List<String>): List<String> =
+        urls.map { it.substringBefore('?').substringAfterLast('/') }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sorted()
+
+    private suspend fun syncedFeedKeys(): List<String> {
+        val json = cache.get(KEY_SYNCED_FEEDS)?.json ?: return emptyList()
+        return try {
+            gson.fromJson(json, Array<String>::class.java).toList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private suspend fun markFeedsSynced(keys: List<String>) {
+        cache.put(CacheEntry(KEY_SYNCED_FEEDS, gson.toJson(keys), System.currentTimeMillis()))
     }
 
     private fun parseOfferings(json: String): List<FlyerOfferingDto> {
@@ -80,6 +121,7 @@ class CompareRepository(
 
     private companion object {
         const val KEY_ALL = "all_offerings"
+        const val KEY_SYNCED_FEEDS = "synced_feed_keys"  // feeds da última sincronização
         const val FRESH_MS = 12 * 60 * 60 * 1000L  // 12h — descarrega 1x e usa offline
     }
 }

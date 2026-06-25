@@ -1,103 +1,55 @@
 {
-  "name": "FolhetoSmart — sincronização semanal + relatório",
+  "name": "FolhetoSmart — relatório semanal por email",
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            { "field": "cronExpression", "expression": "0 10 * * 4" }
-          ]
-        }
-      },
-      "id": "schedule-thu",
-      "name": "Quinta 10:00",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [240, 300]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://api.github.com/repos/SUBSTITUI-OWNER/folhetosmart/actions/workflows/produce-flyers.yml/dispatches",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Accept", "value": "application/vnd.github+json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{\n  \"ref\": \"main\"\n}",
+        "httpMethod": "POST",
+        "path": "folhetosmart-relatorio",
+        "responseMode": "onReceived",
         "options": {}
       },
-      "id": "github-dispatch",
-      "name": "Disparar pipeline (GitHub)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [480, 300],
-      "credentials": {
-        "httpHeaderAuth": { "id": "REPLACE", "name": "GitHub PAT (Bearer)" }
-      }
-    },
-    {
-      "parameters": {
-        "amount": 25,
-        "unit": "minutes"
-      },
-      "id": "wait-pipeline",
-      "name": "Esperar o pipeline (25 min)",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [720, 300],
-      "webhookId": "folhetosmart-wait"
-    },
-    {
-      "parameters": {
-        "operation": "download",
-        "bucketName": "folhetosmart",
-        "fileKey": "relatorios/ultimo.txt"
-      },
-      "id": "r2-report",
-      "name": "Ler relatório (R2)",
-      "type": "n8n-nodes-base.s3",
-      "typeVersion": 1,
-      "position": [960, 300],
-      "credentials": {
-        "s3": { "id": "REPLACE", "name": "Cloudflare R2 (S3)" }
-      }
+      "id": "webhook-report",
+      "name": "Receber relatório (Webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        320,
+        300
+      ],
+      "webhookId": "folhetosmart-relatorio"
     },
     {
       "parameters": {
         "sendTo": "rubensousa106@gmail.com",
         "subject": "FolhetoSmart — relatório semanal de folhetos",
         "emailType": "text",
-        "message": "={{ $binary.data ? $binary.data.toString() : $json.data }}",
+        "message": "={{ $json.body.report }}",
         "options": {}
       },
       "id": "gmail-send",
-      "name": "Enviar relatório (Gmail)",
+      "name": "Enviar email (Gmail)",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [1200, 300],
+      "position": [
+        560,
+        300
+      ],
       "credentials": {
         "gmailOAuth2": { "id": "REPLACE", "name": "Gmail" }
       }
     }
   ],
   "connections": {
-    "Quinta 10:00": {
-      "main": [[{ "node": "Disparar pipeline (GitHub)", "type": "main", "index": 0 }]]
-    },
-    "Disparar pipeline (GitHub)": {
-      "main": [[{ "node": "Esperar o pipeline (25 min)", "type": "main", "index": 0 }]]
-    },
-    "Esperar o pipeline (25 min)": {
-      "main": [[{ "node": "Ler relatório (R2)", "type": "main", "index": 0 }]]
-    },
-    "Ler relatório (R2)": {
-      "main": [[{ "node": "Enviar relatório (Gmail)", "type": "main", "index": 0 }]]
+    "Receber relatório (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "Enviar email (Gmail)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": { "executionOrder": "v1" }

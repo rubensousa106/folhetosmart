@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
+import com.folhetosmart.data.models.FlyerOfferingDto
 import com.folhetosmart.data.repository.CompareRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
@@ -42,23 +43,26 @@ class SyncViewModel(
     init {
         // Carga automática (usa a cache se estiver fresca) — sem Snackbar.
         verify(manual = false)
+        // E, se o servidor já tiver um feed mais recente, descarrega-o sozinho —
+        // sincroniza "mal esteja disponível", sem o utilizador carregar em nada.
+        autoSyncIfNewer()
     }
 
     /** Botão "Sincronizar agora" — descarrega o ficheiro mais recente. */
     fun verify() = verify(manual = true)
 
-    private fun verify(manual: Boolean) {
+    private fun verify(manual: Boolean, force: Boolean = manual) {
         viewModelScope.launch {
             (_uiState.value as? SyncUiState.Content)?.let {
                 _uiState.value = it.copy(checking = true, errorMessage = null)
             }
             try {
-                // Manual = descarrega fresco; automático = cache se estiver fresca.
-                val offerings = withTimeout(TIMEOUT_MS) { compareRepository.allOfferings(force = manual) }
+                // force = descarrega fresco; senão usa a cache se estiver fresca.
+                val offerings = withTimeout(TIMEOUT_MS) { compareRepository.allOfferings(force = force) }
                 val content = SyncUiState.Content(
                     synced = offerings.isNotEmpty(),
                     productCount = offerings.size,
-                    validityLabel = currentWeekValidity(),
+                    validityLabel = validityFromOfferings(offerings),
                     lastCheckedLabel = LocalTime.now().format(HHMM),
                     checking = false
                 )
@@ -79,6 +83,44 @@ class SyncViewModel(
             is SyncUiState.Content -> s.copy(checking = false, errorMessage = message)
             else -> SyncUiState.Error(message)
         }
+    }
+
+    /** Se o servidor tiver um feed mais recente que o sincronizado, descarrega-o. */
+    private fun autoSyncIfNewer() {
+        viewModelScope.launch {
+            try {
+                if (compareRepository.hasNewerFeed()) verify(manual = false, force = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // silencioso — a sincronização manual continua disponível
+            }
+        }
+    }
+
+    /**
+     * Datas REAIS dos ficheiros .json: início mais cedo → fim mais tarde entre as
+     * ofertas válidas (cada `validade` é "dd/MM/yyyy a dd/MM/yyyy"). Assim a data do
+     * ecrã coincide SEMPRE com os feeds. Sem ofertas datáveis, cai na semana atual.
+     */
+    private fun validityFromOfferings(offerings: List<FlyerOfferingDto>): String {
+        val starts = mutableListOf<LocalDate>()
+        val ends = mutableListOf<LocalDate>()
+        offerings.forEach { o ->
+            val parts = o.validade?.split(" a ") ?: return@forEach
+            if (parts.size == 2) {
+                parseDate(parts[0])?.let { starts += it }
+                parseDate(parts[1])?.let { ends += it }
+            }
+        }
+        if (starts.isEmpty() || ends.isEmpty()) return currentWeekValidity()
+        return "${starts.min().format(DM)} a ${ends.max().format(DMY)}"
+    }
+
+    private fun parseDate(s: String): LocalDate? = try {
+        LocalDate.parse(s.trim(), DMY)
+    } catch (e: Exception) {
+        null
     }
 
     private fun currentWeekValidity(): String {

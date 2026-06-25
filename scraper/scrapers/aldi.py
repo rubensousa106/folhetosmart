@@ -60,6 +60,7 @@ def _load_env() -> None:
 _load_env()
 
 # Rede com inspeção TLS: confiar no cert store do SO (silencioso se ausente).
+os.environ.pop("SSLKEYLOGFILE", None)  # proxy de inspeção TLS injeta-o; o truststore rebenta
 try:
     import truststore as _truststore
     _truststore.inject_into_ssl()
@@ -297,10 +298,12 @@ def _current_window() -> tuple[dt.date, dt.date]:
     return thursday, thursday + dt.timedelta(days=6)
 
 
-def _flyer_key(region: str) -> str:
-    """Nome do PDF no R2: 'Aldi {Região} DD-MM-YYYY - DD-MM-YYYY.pdf'."""
-    valid_from, valid_until = _current_window()
-    return f"Aldi {REGION_LABEL[region]} {valid_from:%d-%m-%Y} - {valid_until:%d-%m-%Y}.pdf"
+def _validity(pdf_path) -> tuple[dt.date, dt.date]:
+    """Datas REAIS do folheto, lidas do texto do PDF (o Aldi tem-nas em texto);
+    recurso à janela da semana (quinta-quarta) se não conseguir ler."""
+    from pdf_extractor import extract_validity_from_pdf  # lazy
+    ini, fim = extract_validity_from_pdf(pdf_path)
+    return (ini, fim) if ini and fim else _current_window()
 
 
 def download_region_to_r2(region: str) -> str:
@@ -309,7 +312,8 @@ def download_region_to_r2(region: str) -> str:
     if not r2_storage.is_configured():
         raise RuntimeError("Aldi: R2 não configurado (R2_ENDPOINT/BUCKET/keys)")
     pdf = download_region_pdf(region)
-    key = _flyer_key(region)
+    ini, fim = _validity(pdf)
+    key = f"Aldi {REGION_LABEL[region]} {ini:%d-%m-%Y} - {fim:%d-%m-%Y}.pdf"
     r2_storage.upload_pdf(key, pdf)
     logger.info("Aldi: folheto de %s no R2 como '%s'", REGION_LABEL[region], key)
     return key

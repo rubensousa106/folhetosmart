@@ -33,6 +33,7 @@ def _load_env_file() -> None:
 
 _load_env_file()
 
+os.environ.pop("SSLKEYLOGFILE", None)  # proxy de inspeção TLS injeta-o; o truststore rebenta
 try:  # redes com inspeção TLS
     import truststore as _truststore
     _truststore.inject_into_ssl()
@@ -58,7 +59,9 @@ def build_report() -> tuple[str, dict]:
     nomes: list[str] = []
     if r2_storage.is_configured():
         try:
-            nomes = [p["name"] for p in r2_storage.list_pdfs()]
+            # Só os folhetos ATUAIS (no root) — ignora os arquivados em backup/.
+            nomes = [p["name"] for p in r2_storage.list_pdfs()
+                     if not p["name"].startswith("backup/")]
         except Exception as exc:  # noqa: BLE001
             logger.warning("Não consegui listar o R2: %s", exc)
 
@@ -88,10 +91,26 @@ def build_report() -> tuple[str, dict]:
     return "\n".join(linhas), {"feitos": list(feitos), "em_falta": em_falta}
 
 
+def _send_to_n8n(report: str, data: dict) -> None:
+    """Envia o relatório para um webhook do n8n (que depois o envia por email).
+    Best-effort: só se N8N_REPORT_WEBHOOK estiver definido."""
+    webhook = os.getenv("N8N_REPORT_WEBHOOK", "").strip()
+    if not webhook:
+        return
+    try:
+        import requests  # lazy
+        verify = os.getenv("FOLHETO_INSECURE_TLS", "0") != "1"
+        requests.post(webhook, json={"report": report, **data}, timeout=30, verify=verify)
+        print("\n📤 Relatório enviado para o webhook do n8n.")
+    except Exception as exc:  # noqa: BLE001
+        print(f"\n(⚠️ não consegui enviar o relatório ao n8n: {exc})")
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    report, _ = build_report()
+    report, data = build_report()
     print(report)
+    _send_to_n8n(report, data)
 
     if r2_storage.is_configured():
         try:

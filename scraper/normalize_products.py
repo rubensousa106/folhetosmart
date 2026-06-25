@@ -15,6 +15,12 @@ ANTHROPIC_API_KEY, ANTHROPIC_MODEL (opcional), FOLHETO_INSECURE_TLS (dev).
 from __future__ import annotations
 
 # Em redes com inspeção TLS, confiar no cert store do Windows (Anthropic/httpx).
+# Alguns proxies de inspeção (ex.: nllMonFltProxy) injetam SSLKEYLOGFILE a apontar
+# para um *device* próprio; o truststore tenta abri-lo e rebenta com
+# PermissionError [Errno 13] (intermitente). Remover esse env evita o crash.
+import os  # noqa: E402
+
+os.environ.pop("SSLKEYLOGFILE", None)
 try:
     import truststore as _truststore
     _truststore.inject_into_ssl()
@@ -49,11 +55,19 @@ _load_env_file()
 
 import requests  # noqa: E402
 from storage.r2_storage import r2_storage  # noqa: E402
+from drive_producer import ALDI_POR_REGIAO  # noqa: E402 — fonte única da flag
 
 logger = logging.getLogger(__name__)
 
 # Chaves (em minúsculas) tal como o produtor as grava no backend.
-STORE_KEYS = ["continente", "pingo doce", "lidl", "aldi", "intermarché", "intermarche"]
+STORE_KEYS = ["continente", "pingo doce", "lidl", "intermarché", "intermarche", "aldi"]
+# Aldi por região: só quando o produtor distingue as 7 zonas (ALDI_POR_REGIAO=True).
+# Com a flag a False processa-se 1 só "Aldi" (folhetos regionais iguais) e estas
+# chaves NÃO entram no feed — evita "Aldis fantasma" de corridas antigas que ainda
+# estejam no backend (ex.: Aldi Açores/Madeira de uma extração interrompida).
+if ALDI_POR_REGIAO:
+    STORE_KEYS += ["aldi norte", "aldi centro", "aldi lisboa", "aldi sul",
+                   "aldi algarve", "aldi açores", "aldi madeira"]
 
 BATCH = 60  # produtos por chamada ao Claude (evita truncar o output)
 
@@ -239,12 +253,21 @@ def _publish_feed_to_r2(token: str, stores: dict, canon: dict, marca: dict) -> N
     ends = [e for e in ends if e]
     valid_until = max(ends).strftime("%d-%m-%Y") if ends else ""
     logger.info("📦 Feed em %s (válido até %s)", key, valid_until or "?")
-    resp = requests.post(
-        f"{_backend_base()}/api/v1/admin/feed-url",
-        json={"url": url, "valid_until": valid_until},
-        headers={"Authorization": f"Bearer {token}"},
-        timeout=120, verify=_verify_tls(),
-    )
+
+    def _post_feed_url():
+        return requests.post(
+            f"{_backend_base()}/api/v1/admin/feed-url",
+            json={"url": url, "valid_until": valid_until},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=120, verify=_verify_tls(),
+        )
+
+    resp = _post_feed_url()
+    if resp.status_code == 429:  # rate-limit admin (bucket de 10/min): espera e repete
+        import time as _time
+        logger.warning("⏳ feed-url 429 (rate-limit admin) — aguardo 65s e repito")
+        _time.sleep(65)
+        resp = _post_feed_url()
     if resp.status_code < 400:
         logger.info("✅ Feed publicado no R2 (%d ofertas) — /all passa a servir do R2", len(feed))
         # Alerta push aos utilizadores: "produtos da semana disponíveis" (best-effort).

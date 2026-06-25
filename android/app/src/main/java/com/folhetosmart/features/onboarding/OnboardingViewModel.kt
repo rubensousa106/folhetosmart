@@ -24,7 +24,9 @@ data class OnboardingUiState(
     val accountCreated: Boolean = false,
     /** Passo 2 concluído (guardado ou saltado) — a UI termina o registo. */
     val locationDone: Boolean = false,
-    val notificationsAccepted: Boolean = false
+    val notificationsAccepted: Boolean = false,
+    /** Nome dado no passo 1 (guardado já aí; reenviado no passo 2 p/ não ser apagado). */
+    val name: String = ""
 )
 
 class OnboardingViewModel(
@@ -40,7 +42,7 @@ class OnboardingViewModel(
      * Passo 1 — cria a conta. Só é chamado com a checkbox de termos marcada.
      * Regista o consentimento (versão + notificações) logo a seguir.
      */
-    fun createAccount(email: String, password: String, notificationsAccepted: Boolean) {
+    fun createAccount(name: String, email: String, password: String, notificationsAccepted: Boolean) {
         if (email.isBlank() || password.isBlank()) {
             _uiState.value = OnboardingUiState(error = "Preenche o email e a palavra-passe.")
             return
@@ -49,6 +51,15 @@ class OnboardingViewModel(
             _uiState.value = OnboardingUiState(submitting = true)
             try {
                 alertsRepository.register(email.trim(), password)
+                // Guarda já o nome (a conta existe e tem sessão) — best effort.
+                val cleanName = name.trim()
+                if (cleanName.isNotBlank()) {
+                    try {
+                        userRepository.updateProfile(cleanName, null, null)
+                    } catch (e: Exception) {
+                        // Não bloqueia o registo; o nome pode ser definido depois.
+                    }
+                }
                 // Consentimento explícito (RGPD) — best effort: a conta já existe.
                 try {
                     privacyRepository.registerConsent(notificationsAccepted)
@@ -57,7 +68,8 @@ class OnboardingViewModel(
                 }
                 _uiState.value = OnboardingUiState(
                     accountCreated = true,
-                    notificationsAccepted = notificationsAccepted
+                    notificationsAccepted = notificationsAccepted,
+                    name = cleanName
                 )
             } catch (e: HttpException) {
                 val message = when (e.code()) {
@@ -80,7 +92,9 @@ class OnboardingViewModel(
         viewModelScope.launch {
             _uiState.value = current.copy(submitting = true, error = null)
             try {
-                userRepository.updateLocation(district, city)
+                // Reenvia o nome: o PUT /me substitui os 3 campos, por isso enviar
+                // só a localização apagaria o nome dado no passo 1.
+                userRepository.updateProfile(current.name.ifBlank { null }, district, city)
                 _uiState.value = current.copy(submitting = false, locationDone = true)
             } catch (e: Exception) {
                 _uiState.value = current.copy(

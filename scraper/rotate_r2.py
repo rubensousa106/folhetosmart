@@ -1,15 +1,16 @@
 """Rotação/limpeza semanal do Cloudflare R2 (correr à quinta, DEPOIS de normalizar).
 
-Regra:
-  - MANTÉM no root: os PDFs ainda válidos (validade não terminou) + o feed JSON
-    mais recente (produtos_AAAA-MM-DD.json).
-  - MOVE para `backup/`: tudo o resto do root (folhetos expirados, feeds antigos,
-    ficheiros soltos).
-  - APAGA de `backup/`: o que já lá estava há mais de 6 dias (a semana-2).
+Regra (os PDFs de folhetos E os feeds JSON normalizados têm a validade no nome):
+  - MANTÉM no root: os ativos ainda VÁLIDOS (data de fim >= hoje) ou sem data
+    legível. VÁRIOS feeds válidos coexistem — a app consome todos e esconde só os
+    produtos já expirados.
+  - MOVE para `backup/`: os ativos cuja validade já EXPIROU (fim < hoje) + ficheiros
+    soltos/legados.
+  - APAGA de `backup/`: os ativos cuja validade expirou há mais de 2 SEMANAS (14
+    dias, pela data no nome); os ficheiros sem data legível, pela antiguidade.
 
-É idempotente e seguro: re-correr no mesmo dia NÃO perde o backup acabado de criar
-(o apagar do backup usa a antiguidade > 6 dias). Usa `--dry-run` para ver o que
-faria sem mexer em nada.
+É idempotente e seguro: re-correr no mesmo dia não remove o backup acabado de criar.
+Usa `--dry-run` para ver o que faria sem mexer em nada.
 
 Uso:
     python rotate_r2.py --dry-run
@@ -17,6 +18,9 @@ Uso:
 """
 from __future__ import annotations
 
+import os  # noqa: E402
+
+os.environ.pop("SSLKEYLOGFILE", None)  # proxy de inspeção TLS injeta-o; o truststore rebenta
 try:
     import truststore as _truststore
     _truststore.inject_into_ssl()
@@ -52,21 +56,35 @@ from storage.r2_storage import r2_storage  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-_DATE = re.compile(r"(\d{1,2})[-/](\d{1,2})[-/](\d{4})")
-_FEED = re.compile(r"produtos_(\d{4}-\d{2}-\d{2})\.json$")
-BACKUP_KEEP_DAYS = 6
+# Datas no nome: DD-MM-AAAA, DD/MM/AAAA, DD_MM_AAAA, DDMMAAAA (8) ou DDMMAA (6).
+_DATE_TOKEN = re.compile(r"\d{1,2}[-/_]\d{1,2}[-/_]\d{4}|\d{8}|\d{6}")
+DELETE_AFTER_EXPIRY_DAYS = 14  # apaga do backup 2 semanas DEPOIS de a validade expirar
+
+
+def _is_dated_asset(key: str) -> bool:
+    """Ativo com validade no nome: PDF de folheto ou feed JSON normalizado
+    (produtos_DD-MM-AAAA_DD-MM-AAAA.json)."""
+    base = os.path.basename(key).lower()
+    return base.endswith(".pdf") or base.startswith("produtos")
+
+
+def _to_date(token: str) -> date | None:
+    digits = re.sub(r"\D", "", token)
+    try:
+        if len(digits) == 8:   # DDMMAAAA
+            return date(int(digits[4:8]), int(digits[2:4]), int(digits[0:2]))
+        if len(digits) == 6:   # DDMMAA
+            return date(2000 + int(digits[4:6]), int(digits[2:4]), int(digits[0:2]))
+    except ValueError:
+        return None
+    return None
 
 
 def _valid_until(key: str) -> date | None:
-    """Última data DD-MM-AAAA no nome do PDF (= a validade 'até')."""
-    matches = _DATE.findall(key)
-    if not matches:
-        return None
-    d, m, y = matches[-1]
-    try:
-        return date(int(y), int(m), int(d))
-    except ValueError:
-        return None
+    """Data de FIM da validade = a data mais tarde no nome do folheto. Aceita os
+    separadores -, /, _ e os formatos sem separador (uploads manuais antigos)."""
+    dates = [d for d in (_to_date(t) for t in _DATE_TOKEN.findall(key)) if d]
+    return max(dates) if dates else None
 
 
 def rotate(dry_run: bool = False) -> None:
@@ -76,26 +94,38 @@ def rotate(dry_run: bool = False) -> None:
 
     today = date.today()
     objs = r2_storage.list_all()
-    root = [o for o in objs if not o["key"].startswith("backup/")]
+    # `relatorios/` (relatórios para a automação/n8n) e `backup/` ficam intactos.
+    root = [o for o in objs if not o["key"].startswith(("backup/", "relatorios/"))]
     backup = [o for o in objs if o["key"].startswith("backup/")]
 
-    # Feed JSON mais recente (por data no nome) — fica no root (a app usa-o).
-    feeds = [(o["key"], _FEED.search(o["key"]).group(1)) for o in root if _FEED.search(o["key"])]
-    latest_feed = max(feeds, key=lambda f: f[1])[0] if feeds else None
-
+    # ROOT: mantém os ativos (PDF ou feed) AINDA VÁLIDOS — fim de validade >= hoje,
+    # ou sem data legível. Move para backup/ os já expirados. Vários feeds válidos
+    # ficam no root ao mesmo tempo (a app consome todos e esconde só os expirados).
     keep: set[str] = set()
-    if latest_feed:
-        keep.add(latest_feed)
+    to_move: list[str] = []
     for o in root:
         k = o["key"]
-        if k.lower().endswith(".pdf"):
+        if _is_dated_asset(k):
             vu = _valid_until(k)
-            if vu is None or vu >= today:  # válido (ou sem data legível) → mantém
+            if vu is None or vu >= today:
                 keep.add(k)
+            else:
+                to_move.append(k)
+        else:
+            to_move.append(k)  # ficheiro solto/legado → arquiva
 
-    to_move = [o["key"] for o in root if o["key"] not in keep]
-    cutoff = datetime.now(timezone.utc) - timedelta(days=BACKUP_KEEP_DAYS)
-    to_delete = [o["key"] for o in backup if o.get("modified") is None or o["modified"] < cutoff]
+    # BACKUP: apaga 2 semanas DEPOIS de a validade expirar (data no nome). Sem data
+    # legível, recorre à antiguidade do ficheiro no backup.
+    cutoff_modified = datetime.now(timezone.utc) - timedelta(days=DELETE_AFTER_EXPIRY_DAYS)
+    to_delete: list[str] = []
+    for o in backup:
+        k = o["key"]
+        vu = _valid_until(k)
+        if vu is not None:
+            if today > vu + timedelta(days=DELETE_AFTER_EXPIRY_DAYS):
+                to_delete.append(k)
+        elif o.get("modified") is None or o["modified"] < cutoff_modified:
+            to_delete.append(k)
 
     prefix = "[DRY-RUN] " if dry_run else ""
     logger.info("%sManter no root (%d): %s", prefix, len(keep), sorted(keep))

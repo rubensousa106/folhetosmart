@@ -24,6 +24,9 @@ from __future__ import annotations
 # interceção): faz a Anthropic e o Drive (httpx/httplib2) funcionarem SEM mexer
 # no pdf_extractor. Silencioso se o truststore não existir (ex.: no GitHub
 # Actions, sem interceção, usa-se o certifi normal).
+import os  # noqa: E402
+
+os.environ.pop("SSLKEYLOGFILE", None)  # proxy de inspeção TLS injeta-o; o truststore rebenta
 try:
     import truststore as _truststore
     _truststore.inject_into_ssl()
@@ -73,14 +76,30 @@ _SUPERMERCADOS = {
     "pingo doce": "Pingo Doce",
     "pingodoce": "Pingo Doce",
     "lidl": "Lidl",
-    "aldi": "Aldi",
     "intermarche": "Intermarché",
     "intermarché": "Intermarché",
 }
 
+# O Aldi é REGIONAL: o produtor SABE distinguir as 7 regiões (Aldi Norte, …) para
+# a app poder mostrar só o folheto da zona do utilizador.
+#
+# ⚠️ ESTA SEMANA os folhetos das 7 regiões são IGUAIS, por isso processa-se UM só
+# "Aldi" (nacional) — poupa 7× a extração/IA. NÃO APAGAR a lógica regional abaixo:
+# pode voltar a ser precisa. Basta pôr ALDI_POR_REGIAO=True quando os folhetos
+# regionais voltarem a divergir, e o produtor distingue de novo Aldi Norte/Centro/…
+ALDI_POR_REGIAO = False
+_ALDI_REGIOES = ("Norte", "Centro", "Lisboa", "Sul", "Algarve", "Açores", "Madeira")
+
 
 def _detect_supermarket(filename: str) -> str | None:
     low = filename.lower()
+    if "aldi" in low:
+        if ALDI_POR_REGIAO:
+            for reg in _ALDI_REGIOES:
+                if reg.lower() in low:
+                    return f"Aldi {reg}"
+        # Um só Aldi (folhetos regionais iguais) ou Aldi sem região no nome (nacional).
+        return "Aldi"
     for chave, nome in _SUPERMERCADOS.items():
         if chave in low:
             return nome
@@ -88,8 +107,14 @@ def _detect_supermarket(filename: str) -> str | None:
 
 
 def _list_flyer_pdfs() -> list[dict]:
-    """PDFs no bucket R2 (mais recentes primeiro). Cada item: {key, name, modified}."""
-    return r2_storage.list_pdfs()
+    """PDFs VÁLIDOS no bucket R2 (mais recentes primeiro). Cada item: {key, name, modified}.
+
+    Ignora a pasta `backup/`: são folhetos já rodados/expirados que o `rotate_r2`
+    arquivou. Sem este filtro eram reprocessados, porque a rotação dá-lhes um
+    `modified` mais recente que o folheto atual no root e ficavam à frente na
+    ordenação — fazendo extrair a semana PASSADA em vez da atual.
+    """
+    return [p for p in r2_storage.list_pdfs() if not p["key"].startswith("backup/")]
 
 
 def _cache_path(flyer_name: str) -> str:

@@ -6,7 +6,8 @@ https://www.continente.pt/folhetos/ lista os folhetos em
 `{base}/GetPDF.ashx`. Escolhe o semanal principal (exclui as variantes regionais
 Madeira/Açores e o formato Bom Dia "cbd").
 
-Integra com R2 ("Continente DD-MM-YYYY - DD-MM-YYYY.pdf"); upload manual = fallback.
+Datas de validade: usam a janela da semana (segunda-domingo) — as datas do site
+não correspondem ao folheto; upload manual = fallback.
 """
 from __future__ import annotations
 
@@ -15,13 +16,13 @@ import logging
 import os
 import re
 import sys
-from html import unescape
 from pathlib import Path
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
+os.environ.pop("SSLKEYLOGFILE", None)  # proxy de inspeção TLS injeta-o; o truststore rebenta
 try:  # redes com inspeção TLS
     import truststore as _truststore
     _truststore.inject_into_ssl()
@@ -37,12 +38,6 @@ FOLHETOS_PAGE = "https://www.continente.pt/folhetos/"
 # Marcadores que NÃO são o folheto semanal principal (variantes/regiões/formatos).
 _EXCLUDE = ("mad", "acores", "açores", "cbd", "modelo", "-bd")
 
-_MESES = {
-    "janeiro": 1, "fevereiro": 2, "março": 3, "marco": 3, "abril": 4, "maio": 5,
-    "junho": 6, "julho": 7, "agosto": 8, "setembro": 9, "outubro": 10,
-    "novembro": 11, "dezembro": 12,
-}
-
 
 def _select_semanal(html: str, week: int) -> str:
     """Base do folheto semanal principal da semana atual."""
@@ -54,42 +49,20 @@ def _select_semanal(html: str, week: int) -> str:
     return sorted(principal, key=len)[0].rstrip("/")  # o mais curto = o principal
 
 
-def _validity(html: str) -> tuple[dt.date, dt.date]:
-    """(início, fim) a partir de 'De DD de Mês até DD de Mês'; cai na semana ISO."""
-    # A página codifica "até" como "at&eacute;" — descodifica as entidades HTML.
-    m = re.search(
-        r"De\s+(\d{1,2})\s+de\s+(\w+)\s+at[ée]\s+(\d{1,2})\s+de\s+(\w+)",
-        unescape(html), re.IGNORECASE,
-    )
-    if not m:
-        return fc.week_window()
-    try:
-        y = dt.date.today().year
-        ini = dt.date(y, _MESES[m.group(2).lower()], int(m.group(1)))
-        fim = dt.date(y, _MESES[m.group(4).lower()], int(m.group(3)))
-        if fim < ini:
-            fim = fim.replace(year=y + 1)  # intervalo a virar o ano
-        return ini, fim
-    except Exception:  # noqa: BLE001
-        return fc.week_window()
-
-
-def _resolve() -> tuple[str, tuple[dt.date, dt.date]]:
+def _resolve_base() -> str:
     resp = fc.session().get(FOLHETOS_PAGE, verify=fc.verify_tls(), timeout=30)
     resp.raise_for_status()
     base = _select_semanal(resp.text, dt.date.today().isocalendar()[1])
     logger.info("Continente: %s", base)
-    return base, _validity(resp.text)
+    return base
 
 
 def resolve_pdf_url() -> str:
-    base, _ = _resolve()
-    return base + "/GetPDF.ashx"
+    return _resolve_base() + "/GetPDF.ashx"
 
 
 def download_pdf() -> Path:
-    base, _ = _resolve()
-    return fc.download_pdf(base + "/GetPDF.ashx", "continente")
+    return fc.download_pdf(_resolve_base() + "/GetPDF.ashx", "continente")
 
 
 def fetch_products() -> list[dict]:
@@ -101,8 +74,8 @@ def fetch_products() -> list[dict]:
 
 
 def download_to_r2() -> str:
-    base, (ini, fim) = _resolve()
-    pdf = fc.download_pdf(base + "/GetPDF.ashx", "continente")
+    pdf = download_pdf()
+    ini, fim = fc.week_window()  # modelo simples: semana segunda-domingo
     key = f"Continente {ini:%d-%m-%Y} - {fim:%d-%m-%Y}.pdf"
     return fc.upload_to_r2(pdf, key)
 

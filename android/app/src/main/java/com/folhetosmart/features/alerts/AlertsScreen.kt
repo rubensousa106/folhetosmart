@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,7 +42,10 @@ import com.folhetosmart.ui.components.LoadingView
 
 /** Ecrã Alertas: sessão + gestão de alertas de preço. */
 @Composable
-fun AlertsScreen(viewModel: AlertsViewModel = viewModel(factory = AlertsViewModel.Factory)) {
+fun AlertsScreen(
+    onGoToSync: () -> Unit = {},
+    viewModel: AlertsViewModel = viewModel(factory = AlertsViewModel.Factory)
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     when (val s = state) {
@@ -58,7 +62,8 @@ fun AlertsScreen(viewModel: AlertsViewModel = viewModel(factory = AlertsViewMode
             state = s,
             onDelete = viewModel::deleteAlert,
             onRefresh = viewModel::loadAlerts,
-            onLogout = viewModel::logout
+            onLogout = viewModel::logout,
+            onGoToSync = onGoToSync
         )
     }
 }
@@ -140,7 +145,8 @@ private fun AlertsList(
     state: AlertsUiState.LoggedIn,
     onDelete: (AlertDto) -> Unit,
     onRefresh: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onGoToSync: () -> Unit
 ) {
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -174,6 +180,11 @@ private fun AlertsList(
             )
         }
 
+        // Alerta "novos produtos da semana" (todos os utilizadores) → Sincronizar.
+        if (state.newProductsAvailable) {
+            NewProductsBanner(onGoToSync)
+        }
+
         if (state.refreshing) {
             LoadingView("A carregar alertas…")
         } else if (state.alerts.isEmpty()) {
@@ -189,6 +200,38 @@ private fun AlertsList(
                 items(state.alerts, key = { it.id }) { alert ->
                     AlertRow(alert, onDelete = { onDelete(alert) })
                 }
+            }
+        }
+    }
+}
+
+/** Aviso de topo: há produtos novos da semana para sincronizar. */
+@Composable
+private fun NewProductsBanner(onGoToSync: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+    ) {
+        Column(
+            Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "🆕 Novos produtos disponíveis",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                "Os folhetos desta semana foram atualizados. Sincroniza para veres os preços mais recentes.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Button(onClick = onGoToSync, modifier = Modifier.fillMaxWidth()) {
+                Text("Ir para Sincronizar")
             }
         }
     }

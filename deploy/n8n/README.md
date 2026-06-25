@@ -1,41 +1,52 @@
-# Automação n8n — sincronização semanal de folhetos + relatório por email
+# Automação n8n — relatório semanal de folhetos por email
 
-**Fluxo:** às quintas, o n8n dispara o pipeline (GitHub Actions `produce-flyers.yml`),
-que descarrega os folhetos automáticos (**Aldi, Pingo Doce, Continente**) para o
-Cloudflare R2, extrai/normaliza, e gera o relatório `relatorios/ultimo.txt` no R2
-(que supermercados foram descarregados e quais faltam). O n8n lê esse relatório e
-envia-o por email para **rubensousa106@gmail.com**.
+**Desenho simples e fiável (2 nós):** o pipeline já corre sozinho às quintas no
+GitHub Actions (`produce-flyers.yml`, cron quinta 09:00 UTC) — descarrega os
+folhetos automáticos (**Aldi, Pingo Doce, Continente**) para o Cloudflare R2,
+extrai/normaliza, e no fim o `report_flyers.py` **envia o relatório para um
+webhook do n8n**. O n8n recebe-o e envia-o por email para **rubensousa106@gmail.com**.
 
-Importa [`sync-folhetos-semanal.json`](sync-folhetos-semanal.json) no teu n8n
-(`https://rubensousa106.app.n8n.cloud`) e configura as credenciais abaixo.
+Assim o n8n não precisa de credenciais do R2 nem do GitHub — só **Webhook → Gmail**.
 
-## Nós do fluxo
+## Configurar (5 passos)
 
-1. **Schedule Trigger** — quinta-feira às 10:00 (cron `0 10 * * 4`).
-2. **HTTP Request — Disparar pipeline** — `POST`
-   `https://api.github.com/repos/<OWNER>/folhetosmart/actions/workflows/produce-flyers.yml/dispatches`
-   - Header `Authorization: Bearer <GITHUB_PAT>` · `Accept: application/vnd.github+json`
-   - Body JSON: `{"ref":"main"}`
-3. **Wait** — 25 minutos (tempo do pipeline correr).
-4. **S3 — Ler relatório (R2)** — *Download Object*: bucket `folhetosmart`,
-   key `relatorios/ultimo.txt` (credencial S3 apontada ao R2 — ver abaixo).
-5. **Gmail — Enviar relatório** — Para `rubensousa106@gmail.com`,
-   Assunto `FolhetoSmart — relatório semanal de folhetos`,
-   Texto = conteúdo do relatório (saída do nó S3).
+1. **Importa** [`sync-folhetos-semanal.json`](sync-folhetos-semanal.json) no teu n8n
+   (`https://rubensousa106.app.n8n.cloud`).
+2. No nó **"Enviar email (Gmail)"**, liga a tua credencial **Gmail (OAuth2)**.
+3. **Ativa** o workflow (canto superior — *Active*), para o webhook de produção ficar a ouvir.
+4. Copia o **Production URL** do nó Webhook
+   (algo como `https://rubensousa106.app.n8n.cloud/webhook/folhetosmart-relatorio`).
+5. No GitHub, em *Settings → Secrets and variables → Actions*, cria o secret
+   **`N8N_REPORT_WEBHOOK`** com esse URL.
 
-## Credenciais a criar no n8n
+Pronto. À quinta, o pipeline corre e o relatório chega ao teu email automaticamente.
 
-| Credencial | Para quê | Valores |
-|---|---|---|
-| **GitHub** (Header Auth) | disparar o workflow | PAT fine-grained no repo `folhetosmart`, permissão **Actions: Read & Write** |
-| **R2 (S3)** | ler o relatório | Endpoint `https://<accountid>.r2.cloudflarestorage.com`, região `auto`, Access Key ID + Secret do R2 (as mesmas `R2_*` do projeto) |
-| **Gmail** (OAuth2) | enviar o email | a tua conta Google |
+## O que o email contém
+
+```
+📋 FolhetoSmart — relatório semanal de folhetos (DD/MM/AAAA)
+
+✅ No Cloudflare (3/5):
+   • Continente — Continente 23-06-2026 - 29-06-2026.pdf
+   • Pingo Doce — Pingo Doce 22-06-2026 - 28-06-2026.pdf
+   • Aldi — Aldi Norte 18-06-2026 - 24-06-2026.pdf
+
+❌ Em falta (2) — fazer upload manual pela app:
+   • Lidl
+   • Intermarché
+```
+
+## Testar agora (sem esperar pela quinta)
+
+- No n8n, abre o workflow e usa **"Listen for test event"** no nó Webhook.
+- Corre localmente: `cd scraper && N8N_REPORT_WEBHOOK="<o teu webhook de teste>" python report_flyers.py`
+  (em Windows define a variável antes do comando). O email deve chegar.
 
 ## Notas
 
-- Substitui `<OWNER>` pelo teu utilizador/organização do GitHub no URL do passo 2.
-- O `produce-flyers.yml` também tem um **cron próprio** (quinta 09:00 UTC). Para não
-  correr 2×, podes **remover o `schedule:` do workflow** e deixar o disparo só ao n8n
-  (assim controlas a hora e recebes o email logo a seguir).
-- Os folhetos **sem scraper automático** (Lidl, Intermarché) aparecem no relatório
-  como "em falta" — basta fazer o upload manual pela app (admin).
+- O **`report_flyers.py`** também guarda o relatório no R2 (`relatorios/ultimo.txt`),
+  caso prefiras lê-lo por lá.
+- Se quiseres que o **n8n** dispare o pipeline (em vez do cron do GitHub Actions),
+  acrescenta antes do Webhook um **Schedule Trigger** (quinta) + um **HTTP Request**
+  que faça `POST https://api.github.com/repos/<OWNER>/folhetosmart/actions/workflows/produce-flyers.yml/dispatches`
+  com header `Authorization: Bearer <PAT actions:write>` e body `{"ref":"main"}`.

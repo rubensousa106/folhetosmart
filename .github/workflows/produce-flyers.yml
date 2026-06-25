@@ -54,6 +54,8 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           FCM_PROJECT_ID: ${{ secrets.FCM_PROJECT_ID }}
           FCM_CREDENTIALS_JSON: ${{ secrets.FCM_CREDENTIALS_JSON }}
+          # Webhook do n8n que recebe o relatório e o envia por email.
+          N8N_REPORT_WEBHOOK: ${{ secrets.N8N_REPORT_WEBHOOK }}
           FOLHETO_FORCE: ${{ inputs.force || '0' }}
           ALVO: ${{ inputs.supermarket }}
         run: |
@@ -62,6 +64,7 @@ jobs:
             -e R2_ENDPOINT -e R2_BUCKET -e R2_ACCESS_KEY_ID -e R2_SECRET_ACCESS_KEY \
             -e FOLHETO_BACKEND_URL -e FOLHETO_ADMIN_EMAIL -e FOLHETO_ADMIN_PASSWORD \
             -e DATABASE_URL -e FCM_PROJECT_ID -e FCM_CREDENTIALS_JSON \
+            -e N8N_REPORT_WEBHOOK \
             -e FOLHETO_FORCE \
             folhetosmart-scraper \
             sh -c "python scrapers/aldi.py --all-regions || true; \

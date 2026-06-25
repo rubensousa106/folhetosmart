@@ -15,6 +15,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -60,7 +61,11 @@ sealed class Destination(
 }
 
 @Composable
-fun FolhetoSmartRoot(isAdmin: Boolean = false, onLogout: () -> Unit = {}) {
+fun FolhetoSmartRoot(
+    isAdmin: Boolean = false,
+    startRoute: String? = null,
+    onLogout: () -> Unit = {}
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -68,6 +73,19 @@ fun FolhetoSmartRoot(isAdmin: Boolean = false, onLogout: () -> Unit = {}) {
     // ADMIN (Fix 2): separador extra "Admin"; restantes veem os separadores base.
     val destinations = remember(isAdmin) {
         if (isAdmin) Destination.all + Destination.Admin else Destination.all
+    }
+
+    // Abre o destino vindo de uma notificação push (ex.: "novos produtos" → "sync"),
+    // uma vez. Ignora rotas desconhecidas e o próprio destino inicial.
+    LaunchedEffect(startRoute) {
+        val target = destinations.firstOrNull { it.route == startRoute }
+        if (target != null && target.route != Destination.Compare.route) {
+            navController.navigate(target.route) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
     }
 
     Scaffold(
@@ -104,7 +122,16 @@ fun FolhetoSmartRoot(isAdmin: Boolean = false, onLogout: () -> Unit = {}) {
                 // área de upload no fundo (bottom sheet).
                 SyncScreen(isAdmin = isAdmin)
             }
-            composable(Destination.Alerts.route) { AlertsScreen() }
+            composable(Destination.Alerts.route) {
+                // O aviso "novos produtos" tem um botão que leva ao Sincronizar.
+                AlertsScreen(onGoToSync = {
+                    navController.navigate(Destination.Sync.route) {
+                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                })
+            }
             composable(Destination.Settings.route) {
                 SettingsScreen(
                     onOpenPrivacyPolicy = { navController.navigate(ROUTE_PRIVACY_POLICY) },

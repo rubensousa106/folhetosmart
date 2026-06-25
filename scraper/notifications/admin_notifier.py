@@ -32,15 +32,22 @@ def notify_missing_flyers(missing_names: list[str]) -> None:
 
 
 def notify_new_flyers(products: int, markets: int, savings_pct: Optional[float]) -> None:
-    """Avisa TODOS os utilizadores de que há folhetos novos esta semana."""
+    """Avisa TODOS os utilizadores de que há folhetos novos esta semana.
+
+    Leva `data.type=new_products` + `route=sync` para a app, ao receber, mostrar o
+    aviso no ecrã Alertas e poder reencaminhar para o Sincronizar.
+    """
     savings = f" · Poupa até {savings_pct:.0f}% esta semana" if savings_pct else ""
     body = f"{products} produtos de {markets} supermercados{savings}"
     logger.info("Broadcast a utilizadores: %s", body)
-    _send("🛒 Novos folhetos disponíveis!", body, _fcm_tokens(admin_only=False))
+    _send(
+        "🛒 Novos produtos disponíveis!", body, _fcm_tokens(admin_only=False),
+        data={"type": "new_products", "route": "sync"},
+    )
 
 
 # --- envio partilhado -------------------------------------------------------
-def _send(title: str, body: str, tokens: list[str]) -> None:
+def _send(title: str, body: str, tokens: list[str], data: Optional[dict] = None) -> None:
     creds = _load_fcm_credentials()
     if not creds or not settings.fcm_project_id:
         return  # FCM não configurado: fica só o log
@@ -49,7 +56,7 @@ def _send(title: str, body: str, tokens: list[str]) -> None:
         return
     try:
         access_token = _access_token(creds)
-        _post_messages(access_token, tokens, title, body)
+        _post_messages(access_token, tokens, title, body, data)
     except Exception as exc:  # noqa: BLE001 — notificação não trava a sync
         logger.warning("FCM: falha ao enviar (%s)", exc)
 
@@ -93,7 +100,8 @@ def _access_token(creds_info: dict) -> str:
     return credentials.token
 
 
-def _post_messages(access_token: str, tokens: list[str], title: str, body: str) -> None:
+def _post_messages(access_token: str, tokens: list[str], title: str, body: str,
+                   data: Optional[dict] = None) -> None:
     import httpx  # lazy
 
     url = (
@@ -104,10 +112,12 @@ def _post_messages(access_token: str, tokens: list[str], title: str, body: str) 
     verify = not settings.insecure_tls
     with httpx.Client(verify=verify, timeout=15.0) as client:
         for token in tokens:
-            payload = {"message": {
+            message = {
                 "token": token,
                 "notification": {"title": title, "body": body},
-            }}
-            resp = client.post(url, headers=headers, json=payload)
+            }
+            if data:  # valores do data têm de ser strings (requisito do FCM)
+                message["data"] = {k: str(v) for k, v in data.items()}
+            resp = client.post(url, headers=headers, json={"message": message})
             if resp.status_code >= 400:
                 logger.warning("FCM: %s -> %s", resp.status_code, resp.text[:200])

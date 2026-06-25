@@ -5,6 +5,8 @@
 # --- Extração de produtos (PDF -> texto -> Claude) ---
 anthropic>=0.40.0
 pdfplumber>=0.11
+pypdfium2>=4.30                   # render das páginas p/ o fallback de VISÃO (folhetos só-imagem)
+Pillow>=10.0                     # converte o render em PNG para enviar ao Claude
 
 # --- HTTP / scraping do folheto Aldi ---
 requests>=2.31

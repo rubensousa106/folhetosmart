@@ -49,6 +49,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.folhetosmart.ui.DistritoCidadeFields
 import com.folhetosmart.ui.UserAvatar
+import kotlinx.coroutines.delay
 
 /** Ecrã Definições — conta (perfil) + privacidade e dados (RGPD). */
 @Composable
@@ -69,6 +70,14 @@ fun SettingsScreen(
         state.exportedJson?.let { json ->
             shareJson(context, json)
             viewModel.consumeExport()
+        }
+    }
+
+    // A confirmação de sucesso desaparece sozinha (sem botão "OK").
+    LaunchedEffect(state.message) {
+        if (state.message != null) {
+            delay(3000)
+            viewModel.consumeMessage()
         }
     }
 
@@ -167,18 +176,14 @@ fun SettingsScreen(
         }
 
         state.message?.let {
+            // Confirmação — desaparece sozinha. Removido o botão "OK": ficava colado
+            // ao "Sair" e um duplo toque por engano terminava a sessão.
             Card(Modifier.fillMaxWidth()) {
-                Row(
-                    Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(onClick = viewModel::consumeMessage) { Text("OK") }
-                }
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(12.dp)
+                )
             }
         }
 

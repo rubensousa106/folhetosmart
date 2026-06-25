@@ -33,13 +33,16 @@ class FolhetoMessagingService : FirebaseMessagingService() {
         val body = message.notification?.body
             ?: message.data["body"]
             ?: "Um produto da tua lista baixou de preço!"
+        // Ex.: "new_products" leva route="sync" → ao tocar, abre o Sincronizar.
+        val route = message.data["route"]
 
-        showNotification(title, body)
+        showNotification(title, body, route)
     }
 
-    private fun showNotification(title: String, body: String) {
+    private fun showNotification(title: String, body: String, route: String? = null) {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            route?.let { putExtra(MainActivity.EXTRA_OPEN_ROUTE, it) }
         }
         val pending = PendingIntent.getActivity(
             this, 0, intent,

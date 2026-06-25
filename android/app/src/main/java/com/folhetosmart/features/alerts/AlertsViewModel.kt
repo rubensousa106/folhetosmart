@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
 import com.folhetosmart.data.api.AlertDto
 import com.folhetosmart.data.repository.AlertsRepository
+import com.folhetosmart.data.repository.CompareRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,11 +31,16 @@ sealed interface AlertsUiState {
         val email: String,
         val alerts: List<AlertDto>,
         val refreshing: Boolean = false,
-        val error: String? = null
+        val error: String? = null,
+        /** Há produtos novos no servidor por sincronizar → mostra o aviso topo. */
+        val newProductsAvailable: Boolean = false
     ) : AlertsUiState
 }
 
-class AlertsViewModel(private val repository: AlertsRepository) : ViewModel() {
+class AlertsViewModel(
+    private val repository: AlertsRepository,
+    private val compareRepository: CompareRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow<AlertsUiState>(AlertsUiState.Loading)
     val uiState: StateFlow<AlertsUiState> = _uiState.asStateFlow()
@@ -85,7 +91,8 @@ class AlertsViewModel(private val repository: AlertsRepository) : ViewModel() {
             _uiState.value = AlertsUiState.LoggedIn(email, emptyList(), refreshing = true)
             try {
                 val alerts = repository.list()
-                _uiState.value = AlertsUiState.LoggedIn(email, alerts)
+                val newProducts = runCatching { compareRepository.hasNewerFeed() }.getOrDefault(false)
+                _uiState.value = AlertsUiState.LoggedIn(email, alerts, newProductsAvailable = newProducts)
             } catch (e: HttpException) {
                 if (e.code() == 401 || e.code() == 403) {
                     // Sessão expirada -> volta ao login.
@@ -129,7 +136,7 @@ class AlertsViewModel(private val repository: AlertsRepository) : ViewModel() {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as FolhetoSmartApp
-                AlertsViewModel(app.container.alertsRepository)
+                AlertsViewModel(app.container.alertsRepository, app.container.compareRepository)
             }
         }
     }

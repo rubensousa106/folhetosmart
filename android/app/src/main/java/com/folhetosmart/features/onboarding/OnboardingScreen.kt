@@ -139,11 +139,12 @@ fun OnboardingScreen(
 private fun AccountStep(
     submitting: Boolean,
     error: String?,
-    onCreate: (String, String, Boolean) -> Unit,
+    onCreate: (String, String, String, Boolean) -> Unit,
     onShowTerms: () -> Unit,
     onShowPrivacy: () -> Unit,
     onBackToLogin: () -> Unit
 ) {
+    var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var termsAccepted by remember { mutableStateOf(false) }
@@ -168,6 +169,14 @@ private fun AccountStep(
             modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
         )
 
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Nome completo") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(8.dp))
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -226,7 +235,7 @@ private fun AccountStep(
         Spacer(Modifier.height(16.dp))
 
         Button(
-            onClick = { onCreate(email, password, notificationsAccepted) },
+            onClick = { onCreate(name, email, password, notificationsAccepted) },
             enabled = termsAccepted && !submitting,
             modifier = Modifier.fillMaxWidth()
         ) {

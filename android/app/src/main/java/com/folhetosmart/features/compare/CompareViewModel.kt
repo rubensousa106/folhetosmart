@@ -10,6 +10,8 @@ import com.folhetosmart.FolhetoSmartApp
 import com.folhetosmart.data.models.FlyerOfferingDto
 import com.folhetosmart.data.repository.CompareRepository
 import com.folhetosmart.data.repository.ShoppingRepository
+import com.folhetosmart.data.repository.UserRepository
+import com.folhetosmart.ui.regiaoDoDistrito
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,7 +40,8 @@ sealed interface CompareUiState {
 
 class CompareViewModel(
     private val compareRepository: CompareRepository,
-    private val shoppingRepository: ShoppingRepository
+    private val shoppingRepository: ShoppingRepository,
+    private val userRepository: UserRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<CompareUiState>(CompareUiState.Loading)
@@ -53,6 +56,10 @@ class CompareViewModel(
     // Todas as ofertas, carregadas uma vez; a pesquisa filtra esta lista em memória.
     private var allOfferings: List<FlyerOfferingDto> = emptyList()
     private var loaded = false
+
+    // Região do utilizador (para escolher o Aldi da zona). Carregada uma vez.
+    private var userRegion: String? = null
+    private var regionLoaded = false
 
     init {
         load()
@@ -69,8 +76,10 @@ class CompareViewModel(
         viewModelScope.launch {
             _uiState.value = CompareUiState.Loading
             try {
-                // Esconde ofertas cuja validade já terminou — o folheto expirou.
-                allOfferings = compareRepository.allOfferings().filterNot { expirou(it.validade) }
+                val region = loadUserRegion()
+                // Esconde expirados e mostra só o Aldi da zona do utilizador.
+                val offers = compareRepository.allOfferings().filterNot { expirou(it.validade) }
+                allOfferings = aldiDaRegiao(offers, region)
                 loaded = true
                 applyFilter(query.value)
             } catch (e: Exception) {
@@ -79,6 +88,40 @@ class CompareViewModel(
                 )
             }
         }
+    }
+
+    /** Região do utilizador (distrito do perfil → região), carregada uma só vez. */
+    private suspend fun loadUserRegion(): String? {
+        if (regionLoaded) return userRegion
+        userRegion = try {
+            regiaoDoDistrito(userRepository.me().district)
+        } catch (e: Exception) {
+            null
+        }
+        regionLoaded = true
+        return userRegion
+    }
+
+    /**
+     * O Aldi vem por região no feed ("Aldi Norte", "Aldi Centro", …). Mostra só o
+     * da zona do utilizador (ou o primeiro, se a zona não estiver definida) e
+     * rotula-o como "Aldi"; esconde os das outras regiões. Os outros supermercados
+     * passam intactos.
+     */
+    private fun aldiDaRegiao(offers: List<FlyerOfferingDto>, region: String?): List<FlyerOfferingDto> {
+        val regionais = offers.filter { it.supermercado.startsWith("Aldi ", ignoreCase = true) }
+        if (regionais.isEmpty()) return offers
+        val escolhido = region
+            ?.let { r -> regionais.firstOrNull { it.supermercado.equals("Aldi $r", ignoreCase = true) }?.supermercado }
+            ?: regionais.first().supermercado
+        return offers
+            .filter { o ->
+                !o.supermercado.startsWith("Aldi ", ignoreCase = true) ||
+                        o.supermercado.equals(escolhido, ignoreCase = true)
+            }
+            .map { o ->
+                if (o.supermercado.equals(escolhido, ignoreCase = true)) o.copy(supermercado = "Aldi") else o
+            }
     }
 
     /** Filtra por nome e agrupa por produto, ordenando cada grupo pelo preço. */
@@ -150,7 +193,8 @@ class CompareViewModel(
                 val app = this[APPLICATION_KEY] as FolhetoSmartApp
                 CompareViewModel(
                     app.container.compareRepository,
-                    app.container.shoppingRepository
+                    app.container.shoppingRepository,
+                    app.container.userRepository
                 )
             }
         }

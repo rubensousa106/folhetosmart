@@ -21,6 +21,7 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
+os.environ.pop("SSLKEYLOGFILE", None)  # proxy de inspeção TLS injeta-o; o truststore rebenta
 try:  # redes com inspeção TLS: confiar no cert store do SO
     import truststore as _truststore
     _truststore.inject_into_ssl()
