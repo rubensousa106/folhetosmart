@@ -206,4 +206,13 @@ public class ProductController {
         }
         return null;
     }
+
+    /** Devolve  a lista de Ficheiros de produtos com a extensão .json disponiveis em R2 **/
+    @GetMapping("/products/feeds")
+    public ResponseEntity<List<String>> getAvailableFeeds() {
+        // Lista os ficheiros no R2 com o padrão "produtos_*.json"
+        List<String> files = r2Service.listFiles("produtos_*.json");
+        // Devolve os URLs públicos (ou os nomes dos ficheiros)
+        return ResponseEntity.ok(files);
+    }
 }
