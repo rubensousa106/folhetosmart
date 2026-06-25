@@ -7,6 +7,7 @@ import com.folhetosmart.prices.dto.PriceHistoryPointDto;
 import com.folhetosmart.prices.dto.ProductPriceDto;
 import com.folhetosmart.products.dto.FlyerOfferingDto;
 import com.folhetosmart.products.dto.ProductDto;
+import com.folhetosmart.storage.R2Service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
@@ -37,14 +38,17 @@ public class ProductController {
     private final PriceService priceService;
     private final LatestProductsRepository latestProductsRepository;
     private final ObjectMapper objectMapper;
+    private final R2Service r2Service;  // ← ADICIONADO
 
     public ProductController(ProductService productService, PriceService priceService,
                              LatestProductsRepository latestProductsRepository,
-                             ObjectMapper objectMapper) {
+                             ObjectMapper objectMapper,
+                             R2Service r2Service) {  // ← ADICIONADO
         this.productService = productService;
         this.priceService = priceService;
         this.latestProductsRepository = latestProductsRepository;
         this.objectMapper = objectMapper;
+        this.r2Service = r2Service;  // ← ADICIONADO
     }
 
     /**
@@ -81,6 +85,7 @@ public class ProductController {
         productService.getEntity(id);
         return ResponseEntity.ok(priceService.priceHistory(id));
     }
+
     /** GET /api/v1/products/latest?supermarket=Continente
      * Devolve o JSON mais recente de um supermercado (lido do Google Drive).
      **/
@@ -157,6 +162,16 @@ public class ProductController {
         return urls;
     }
 
+    /**
+     * GET /api/v1/products/feeds/r2 — lista os URLs dos ficheiros produtos_*.json
+     * disponíveis no Cloudflare R2.
+     */
+    @GetMapping("/feeds/r2")
+    public ResponseEntity<List<String>> getAvailableFeeds() {
+        List<String> files = r2Service.listFiles("produtos_*.json");
+        return ResponseEntity.ok(files);
+    }
+
     /** True se a data de fim (DD-MM-AAAA, guardada no source_flyer) já passou. */
     private static boolean feedExpired(String validUntil, LocalDate today) {
         if (validUntil == null || validUntil.isBlank()) {
@@ -205,14 +220,5 @@ public class ProductController {
             // token que não é data válida
         }
         return null;
-    }
-
-    /** Devolve  a lista de Ficheiros de produtos com a extensão .json disponiveis em R2 **/
-    @GetMapping("/products/feeds")
-    public ResponseEntity<List<String>> getAvailableFeeds() {
-        // Lista os ficheiros no R2 com o padrão "produtos_*.json"
-        List<String> files = r2Service.listFiles("produtos_*.json");
-        // Devolve os URLs públicos (ou os nomes dos ficheiros)
-        return ResponseEntity.ok(files);
     }
 }
