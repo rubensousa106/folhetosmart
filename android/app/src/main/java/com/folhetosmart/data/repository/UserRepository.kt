@@ -12,6 +12,10 @@ class UserRepository(
     private val api: ApiService,
     private val tokenStore: TokenStore
 ) {
+    /** Email guardado no token (local, estável e disponível offline) — usado, por
+     *  exemplo, para semear o avatar sem depender de uma chamada de rede. */
+    val email: String? get() = tokenStore.email
+
     suspend fun me(): UserMeDto = api.me(requireBearer())
 
     /** Atualiza nome + distrito + cidade. */

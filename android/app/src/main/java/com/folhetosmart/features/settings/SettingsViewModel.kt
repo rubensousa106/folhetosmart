@@ -40,7 +40,11 @@ class SettingsViewModel(
     private val users: UserRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SettingsUiState(loggedIn = privacy.isLoggedIn))
+    // Semeia já com o email do token (local) para o avatar ser estável desde o
+    // início — não espera, nem depende, da chamada de rede do loadProfile().
+    private val _uiState = MutableStateFlow(
+        SettingsUiState(loggedIn = privacy.isLoggedIn, email = users.email.orEmpty())
+    )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
