@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
+import com.folhetosmart.data.api.serverMessage
 import com.folhetosmart.data.repository.AlertsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +19,9 @@ import retrofit2.HttpException
 data class LoginUiState(
     val submitting: Boolean = false,
     val error: String? = null,
-    val loggedIn: Boolean = false
+    val loggedIn: Boolean = false,
+    /** Entrou com palavra-passe temporária — a UI deve forçar a definição de uma nova. */
+    val requirePasswordChange: Boolean = false
 )
 
 class LoginViewModel(private val repository: AlertsRepository) : ViewModel() {
@@ -27,20 +30,20 @@ class LoginViewModel(private val repository: AlertsRepository) : ViewModel() {
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
     fun login(email: String, password: String) {
-        if (email.isBlank() || password.isBlank()) {
-            _uiState.value = LoginUiState(error = "Preenche o email e a palavra-passe.")
-            return
-        }
         viewModelScope.launch {
             _uiState.value = LoginUiState(submitting = true)
             try {
-                repository.login(email.trim(), password)
-                _uiState.value = LoginUiState(loggedIn = true)
+                val auth = repository.login(email.trim(), password)
+                _uiState.value = if (auth.mustChangePassword) {
+                    LoginUiState(requirePasswordChange = true)
+                } else {
+                    LoginUiState(loggedIn = true)
+                }
             } catch (e: HttpException) {
                 val message = when (e.code()) {
                     401 -> "Email ou palavra-passe incorretos."
                     429 -> "Demasiadas tentativas. Tenta novamente daqui a 15 minutos."
-                    else -> "Não foi possível iniciar sessão (${e.code()})."
+                    else -> e.serverMessage() ?: "Não foi possível iniciar sessão (${e.code()})."
                 }
                 _uiState.value = LoginUiState(error = message)
             } catch (e: Exception) {

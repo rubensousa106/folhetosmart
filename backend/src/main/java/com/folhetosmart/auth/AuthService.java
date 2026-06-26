@@ -1,6 +1,7 @@
 package com.folhetosmart.auth;
 
 import com.folhetosmart.auth.dto.AuthResponse;
+import com.folhetosmart.auth.dto.ForgotPasswordRequest;
 import com.folhetosmart.auth.dto.LoginRequest;
 import com.folhetosmart.auth.dto.RefreshRequest;
 import com.folhetosmart.auth.dto.RegisterRequest;
@@ -9,10 +10,15 @@ import com.folhetosmart.config.JwtService;
 import io.jsonwebtoken.JwtException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
 
 @Service
 public class AuthService {
@@ -24,13 +30,19 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final PasswordResetMailer mailer;
+    private final long resetTtlMinutes;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService,
+                       PasswordResetMailer mailer,
+                       @Value("${folheto.password-reset.ttl-minutes:60}") long resetTtlMinutes) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.mailer = mailer;
+        this.resetTtlMinutes = resetTtlMinutes;
     }
 
     @Transactional
@@ -58,8 +70,33 @@ public class AuthService {
                     return new ApiException(
                             HttpStatus.UNAUTHORIZED, "Email ou palavra-passe incorretos.");
                 });
+        if (user.getTempPasswordExpiresAt() != null
+                && Instant.now().isAfter(user.getTempPasswordExpiresAt())) {
+            log.warn("Login com palavra-passe temporária expirada — uid={}", user.getId());
+            throw new ApiException(HttpStatus.UNAUTHORIZED,
+                    "A palavra-passe temporária expirou. Pede uma nova.");
+        }
         log.info("Login OK — uid={}", user.getId());
         return toResponse(user);
+    }
+
+    /**
+     * Recuperação de palavra-passe: gera uma temporária, grava-a (e a sua validade)
+     * e pede ao n8n para a enviar por email. Responde sempre de forma neutra — não
+     * revela se o email existe (evita enumeração de contas).
+     */
+    @Transactional
+    public void requestPasswordReset(ForgotPasswordRequest request) {
+        userRepository.findByEmail(request.email()).ifPresentOrElse(user -> {
+            String temp = generateTempPassword();
+            user.setPasswordHash(passwordEncoder.encode(temp));
+            user.setTempPasswordExpiresAt(Instant.now().plus(Duration.ofMinutes(resetTtlMinutes)));
+            userRepository.save(user);
+            mailer.sendTempPassword(user.getEmail(), user.getName(), temp, resetTtlMinutes);
+            log.info("Palavra-passe temporária emitida — uid={}", user.getId());
+        }, () ->
+            log.warn("Recuperação pedida para email inexistente ({})", mask(request.email()))
+        );
     }
 
     /** Troca um refresh token válido por um novo par de tokens. */
@@ -88,7 +125,21 @@ public class AuthService {
                 jwtService.generateToken(user),
                 jwtService.generateRefreshToken(user),
                 user.getEmail(),
-                user.getRole().name());
+                user.getRole().name(),
+                user.getTempPasswordExpiresAt() != null);
+    }
+
+    /** Palavra-passe temporária aleatória (sem caracteres ambíguos: 0/O/1/l/I). */
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final String TEMP_ALPHABET =
+            "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+
+    private static String generateTempPassword() {
+        StringBuilder sb = new StringBuilder(10);
+        for (int i = 0; i < 10; i++) {
+            sb.append(TEMP_ALPHABET.charAt(RANDOM.nextInt(TEMP_ALPHABET.length())));
+        }
+        return sb.toString();
     }
 
     /** "ruben@exemplo.pt" -> "r***@exemplo.pt" (para logs). */

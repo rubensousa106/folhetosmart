@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
+import com.folhetosmart.data.api.serverMessage
 import com.folhetosmart.data.repository.AlertsRepository
 import com.folhetosmart.data.repository.PrivacyRepository
 import com.folhetosmart.data.repository.UserRepository
@@ -20,6 +21,8 @@ import retrofit2.HttpException
 data class OnboardingUiState(
     val submitting: Boolean = false,
     val error: String? = null,
+    /** Erro específico do campo email (ex.: 409 — já existe conta). */
+    val emailError: String? = null,
     /** Passo 1 concluído — a UI avança para a localização. */
     val accountCreated: Boolean = false,
     /** Passo 2 concluído (guardado ou saltado) — a UI termina o registo. */
@@ -72,12 +75,13 @@ class OnboardingViewModel(
                     name = cleanName
                 )
             } catch (e: HttpException) {
-                val message = when (e.code()) {
-                    409 -> "Já existe uma conta com este email. Volta atrás e inicia sessão."
-                    429 -> "Demasiadas tentativas. Tenta novamente daqui a 15 minutos."
-                    else -> "Não foi possível criar a conta (${e.code()})."
+                _uiState.value = when (e.code()) {
+                    409 -> OnboardingUiState(emailError = "Já existe uma conta com este email.")
+                    429 -> OnboardingUiState(error = "Demasiadas tentativas. Tenta novamente daqui a 15 minutos.")
+                    else -> OnboardingUiState(
+                        error = e.serverMessage() ?: "Não foi possível criar a conta (${e.code()})."
+                    )
                 }
-                _uiState.value = OnboardingUiState(error = message)
             } catch (e: Exception) {
                 _uiState.value = OnboardingUiState(
                     error = "Sem ligação ao servidor. Tenta novamente."

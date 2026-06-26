@@ -60,6 +60,8 @@ public class UserController {
                                                @Valid @RequestBody ChangePasswordRequest request) {
         requireCurrentPassword(user, request.currentPassword());
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        // Concluiu o "definir nova palavra-passe": deixa de ser temporária.
+        user.setTempPasswordExpiresAt(null);
         userRepository.save(user);
         return ResponseEntity.noContent().build();
     }
@@ -84,7 +86,8 @@ public class UserController {
                 jwtService.generateToken(user),
                 jwtService.generateRefreshToken(user),
                 user.getEmail(),
-                user.getRole().name());
+                user.getRole().name(),
+                user.getTempPasswordExpiresAt() != null);
     }
 
     private void requireCurrentPassword(User user, String currentPassword) {

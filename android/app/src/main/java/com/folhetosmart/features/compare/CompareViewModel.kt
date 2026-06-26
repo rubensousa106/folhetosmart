@@ -56,13 +56,16 @@ class CompareViewModel(
     // Todas as ofertas, carregadas uma vez; a pesquisa filtra esta lista em memória.
     private var allOfferings: List<FlyerOfferingDto> = emptyList()
     private var loaded = false
+    // A 1.ª busca de rede já terminou? Evita mostrar "vazio" antes disso.
+    private var fetchDone = false
 
     // Região do utilizador (para escolher o Aldi da zona). Carregada uma vez.
     private var userRegion: String? = null
     private var regionLoaded = false
 
     init {
-        load()
+        observeOfferings()
+        refresh()
     }
 
     fun onQueryChange(value: String) {
@@ -70,22 +73,38 @@ class CompareViewModel(
         if (loaded) applyFilter(value)
     }
 
-    fun reload() = load()
+    fun reload() = refresh()
 
-    private fun load() {
+    /**
+     * Observa a cache (Room Flow): a cópia atual e cada (re)escrita re-renderizam o
+     * ecrã. É isto que faz o "Sincronizar agora" (que escreve a cache) aparecer no
+     * Comparar ao vivo, mesmo estando-se noutro separador.
+     */
+    private fun observeOfferings() {
         viewModelScope.launch {
-            _uiState.value = CompareUiState.Loading
-            try {
-                val region = loadUserRegion()
+            val region = loadUserRegion()
+            compareRepository.offeringsStream().collect { raw ->
                 // Esconde expirados e mostra só o Aldi da zona do utilizador.
-                val offers = compareRepository.allOfferings().filterNot { expirou(it.validade) }
-                allOfferings = aldiDaRegiao(offers, region)
+                allOfferings = aldiDaRegiao(raw.filterNot { expirou(it.validade) }, region)
                 loaded = true
-                applyFilter(query.value)
-            } catch (e: Exception) {
+                // Só renderiza "vazio" depois de a 1.ª busca terminar (não pisca).
+                if (raw.isNotEmpty() || fetchDone) applyFilter(query.value)
+            }
+        }
+    }
+
+    /** Dispara a busca de rede que (re)escreve a cache; o stream acima trata do render. */
+    private fun refresh() {
+        viewModelScope.launch {
+            if (allOfferings.isEmpty()) _uiState.value = CompareUiState.Loading
+            val ok = runCatching { compareRepository.allOfferings() }.isSuccess
+            fetchDone = true
+            if (!ok && allOfferings.isEmpty()) {
                 _uiState.value = CompareUiState.Error(
                     "Não foi possível carregar os produtos. Verifica a ligação."
                 )
+            } else {
+                applyFilter(query.value)
             }
         }
     }

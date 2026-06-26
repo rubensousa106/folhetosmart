@@ -7,6 +7,8 @@ import com.folhetosmart.data.local.CacheDao
 import com.folhetosmart.data.local.CacheEntry
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 class CompareRepository(
     private val api: ApiService,
@@ -35,6 +37,15 @@ class CompareRepository(
             cached?.let { parseOfferings(it.json) } ?: throw e
         }
     }
+
+    /**
+     * Fluxo reativo das ofertas válidas guardadas na cache (`KEY_ALL`). Emite a
+     * cópia atual e volta a emitir sempre que a cache é (re)escrita — incluindo
+     * quando o Sincronizar descarrega um feed novo. É o que faz o Comparar
+     * atualizar ao vivo. Não vai à rede; quem alimenta a cache é [allOfferings].
+     */
+    fun offeringsStream(): Flow<List<FlyerOfferingDto>> =
+        cache.observe(KEY_ALL).map { it?.json?.let(::parseOfferings) ?: emptyList() }
 
     /** Descarrega e funde todos os feeds ativos; recorre ao /all se /feeds falhar. */
     private suspend fun fetchAndMerge(): List<FlyerOfferingDto> {

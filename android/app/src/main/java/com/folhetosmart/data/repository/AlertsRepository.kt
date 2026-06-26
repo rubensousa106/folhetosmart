@@ -4,6 +4,7 @@ import com.folhetosmart.data.api.AlertDto
 import com.folhetosmart.data.api.AlertRequest
 import com.folhetosmart.data.api.ApiService
 import com.folhetosmart.data.api.AuthResponse
+import com.folhetosmart.data.api.ForgotPasswordRequest
 import com.folhetosmart.data.api.LoginRequest
 import com.folhetosmart.data.api.RegisterRequest
 import com.folhetosmart.data.local.TokenStore
@@ -21,6 +22,10 @@ class AlertsRepository(
 
     suspend fun register(email: String, password: String): AuthResponse =
         api.register(RegisterRequest(email, password)).also(::storeSession)
+
+    /** Recuperação: pede ao backend para enviar uma palavra-passe temporária por email. */
+    suspend fun forgotPassword(email: String) =
+        api.forgotPassword(ForgotPasswordRequest(email))
 
     fun logout() = tokenStore.clear()
 

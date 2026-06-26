@@ -62,6 +62,11 @@ public class User {
     @Column(name = "deletion_requested_at")
     private Instant deletionRequestedAt;
 
+    // --- Recuperação de palavra-passe ---
+    /** Se ≠ null, a palavra-passe atual é temporária e expira nesta data. */
+    @Column(name = "temp_password_expires_at")
+    private Instant tempPasswordExpiresAt;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

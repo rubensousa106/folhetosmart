@@ -143,11 +143,14 @@ data class PromotionDto(
 // --- Autenticação ----------------------------------------------------------
 data class RegisterRequest(val email: String, val password: String)
 data class LoginRequest(val email: String, val password: String)
+data class ForgotPasswordRequest(val email: String)
 data class AuthResponse(
     val token: String,
     val refreshToken: String? = null,
     val email: String,
-    val role: String
+    val role: String,
+    /** True quando se entrou com uma palavra-passe temporária — obriga a defini-la de novo. */
+    val mustChangePassword: Boolean = false
 )
 
 // --- Privacidade (RGPD) ----------------------------------------------------

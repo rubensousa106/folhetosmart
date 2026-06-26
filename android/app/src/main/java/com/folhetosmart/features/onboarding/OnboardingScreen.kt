@@ -20,7 +20,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,6 +39,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.folhetosmart.features.legal.PrivacyPolicyScreen
 import com.folhetosmart.features.legal.TermsOfServiceScreen
 import com.folhetosmart.ui.DistritoCidadeFields
+import com.folhetosmart.ui.Validators
+import com.folhetosmart.ui.components.ValidatedTextField
 
 /**
  * Registo em 2 passos (Fix 1):
@@ -78,6 +80,7 @@ fun OnboardingScreen(
             AccountStep(
                 submitting = state.submitting,
                 error = state.error,
+                emailServerError = state.emailError,
                 onCreate = viewModel::createAccount,
                 onShowTerms = { showTerms = true },
                 onShowPrivacy = { showPrivacyPolicy = true },
@@ -139,6 +142,7 @@ fun OnboardingScreen(
 private fun AccountStep(
     submitting: Boolean,
     error: String?,
+    emailServerError: String?,
     onCreate: (String, String, String, Boolean) -> Unit,
     onShowTerms: () -> Unit,
     onShowPrivacy: () -> Unit,
@@ -149,6 +153,10 @@ private fun AccountStep(
     var password by remember { mutableStateOf("") }
     var termsAccepted by remember { mutableStateOf(false) }
     var notificationsAccepted by remember { mutableStateOf(false) }
+
+    var nameError by remember { mutableStateOf<String?>(null) }
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -169,29 +177,28 @@ private fun AccountStep(
             modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
         )
 
-        OutlinedTextField(
+        ValidatedTextField(
             value = name,
-            onValueChange = { name = it },
-            label = { Text("Nome completo") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+            onValueChange = { name = it; nameError = null },
+            label = "Nome completo",
+            error = nameError
         )
         Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
+        ValidatedTextField(
             value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+            onValueChange = { email = it; emailError = null },
+            label = "Email",
+            error = emailError ?: emailServerError,
+            keyboardType = KeyboardType.Email
         )
         Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
+        ValidatedTextField(
             value = password,
-            onValueChange = { password = it },
-            label = { Text("Palavra-passe (mín. 8 caracteres)") },
-            singleLine = true,
+            onValueChange = { password = it; passwordError = null },
+            label = "Palavra-passe (mín. 8 caracteres)",
+            error = passwordError,
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth()
+            keyboardType = KeyboardType.Password
         )
 
         Spacer(Modifier.height(16.dp))
@@ -235,7 +242,14 @@ private fun AccountStep(
         Spacer(Modifier.height(16.dp))
 
         Button(
-            onClick = { onCreate(name, email, password, notificationsAccepted) },
+            onClick = {
+                nameError = Validators.required(name, "O nome é obrigatório")
+                emailError = Validators.email(email)
+                passwordError = Validators.password(password)
+                if (nameError == null && emailError == null && passwordError == null) {
+                    onCreate(name, email, password, notificationsAccepted)
+                }
+            },
             enabled = termsAccepted && !submitting,
             modifier = Modifier.fillMaxWidth()
         ) {

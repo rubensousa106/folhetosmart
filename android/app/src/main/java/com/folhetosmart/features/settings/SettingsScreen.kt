@@ -45,10 +45,12 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.folhetosmart.ui.DistritoCidadeFields
 import com.folhetosmart.ui.UserAvatar
+import com.folhetosmart.ui.Validators
+import com.folhetosmart.ui.components.ValidatedTextField
 import kotlinx.coroutines.delay
 
 /** Ecrã Definições — conta (perfil) + privacidade e dados (RGPD). */
@@ -241,6 +243,12 @@ private fun AccountCard(
     var curPwd by remember { mutableStateOf("") }
     var newPwd by remember { mutableStateOf("") }
 
+    var nameError by remember { mutableStateOf<String?>(null) }
+    var newEmailError by remember { mutableStateOf<String?>(null) }
+    var emailPwdError by remember { mutableStateOf<String?>(null) }
+    var curPwdError by remember { mutableStateOf<String?>(null) }
+    var newPwdError by remember { mutableStateOf<String?>(null) }
+
     var menuOpen by remember { mutableStateOf(false) }
     var section by remember { mutableStateOf<String?>(null) }
 
@@ -291,14 +299,18 @@ private fun AccountCard(
             when (section) {
                 "nome" -> {
                     Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = name, onValueChange = { name = it },
-                        label = { Text("Nome") }, singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                    ValidatedTextField(
+                        value = name,
+                        onValueChange = { name = it; nameError = null },
+                        label = "Nome",
+                        error = nameError
                     )
                     Spacer(Modifier.height(8.dp))
                     Button(
-                        onClick = { onSaveProfile(name, district, city) },
+                        onClick = {
+                            nameError = Validators.required(name, "O nome é obrigatório")
+                            if (nameError == null) onSaveProfile(name, district, city)
+                        },
                         enabled = !state.savingProfile,
                         modifier = Modifier.fillMaxWidth()
                     ) { Text(if (state.savingProfile) "A guardar…" else "Guardar nome") }
@@ -320,45 +332,65 @@ private fun AccountCard(
                 }
                 "email" -> {
                     Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = newEmail, onValueChange = { newEmail = it },
-                        label = { Text("Novo email") }, singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                    ValidatedTextField(
+                        value = newEmail,
+                        onValueChange = { newEmail = it; newEmailError = null },
+                        label = "Novo email",
+                        error = newEmailError,
+                        keyboardType = KeyboardType.Email
                     )
                     Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = emailPwd, onValueChange = { emailPwd = it },
-                        label = { Text("Palavra-passe atual") }, singleLine = true,
+                    ValidatedTextField(
+                        value = emailPwd,
+                        onValueChange = { emailPwd = it; emailPwdError = null },
+                        label = "Palavra-passe atual",
+                        error = emailPwdError,
                         visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth()
+                        keyboardType = KeyboardType.Password
                     )
                     Spacer(Modifier.height(8.dp))
                     Button(
-                        onClick = { onChangeEmail(emailPwd, newEmail); emailPwd = "" },
-                        enabled = !state.savingEmail && emailPwd.isNotBlank() &&
-                            newEmail.isNotBlank() && newEmail != state.email,
+                        onClick = {
+                            newEmailError = Validators.email(newEmail)
+                                ?: if (newEmail == state.email) "Indica um email diferente do atual" else null
+                            emailPwdError = Validators.required(emailPwd, "A palavra-passe atual é obrigatória")
+                            if (newEmailError == null && emailPwdError == null) {
+                                onChangeEmail(emailPwd, newEmail); emailPwd = ""
+                            }
+                        },
+                        enabled = !state.savingEmail,
                         modifier = Modifier.fillMaxWidth()
                     ) { Text(if (state.savingEmail) "A alterar…" else "Alterar email") }
                 }
                 "password" -> {
                     Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = curPwd, onValueChange = { curPwd = it },
-                        label = { Text("Palavra-passe atual") }, singleLine = true,
+                    ValidatedTextField(
+                        value = curPwd,
+                        onValueChange = { curPwd = it; curPwdError = null },
+                        label = "Palavra-passe atual",
+                        error = curPwdError,
                         visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth()
+                        keyboardType = KeyboardType.Password
                     )
                     Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = newPwd, onValueChange = { newPwd = it },
-                        label = { Text("Nova palavra-passe (mín. 8)") }, singleLine = true,
+                    ValidatedTextField(
+                        value = newPwd,
+                        onValueChange = { newPwd = it; newPwdError = null },
+                        label = "Nova palavra-passe (mín. 8)",
+                        error = newPwdError,
                         visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth()
+                        keyboardType = KeyboardType.Password
                     )
                     Spacer(Modifier.height(8.dp))
                     Button(
-                        onClick = { onChangePassword(curPwd, newPwd); curPwd = ""; newPwd = "" },
-                        enabled = !state.savingPassword && curPwd.isNotBlank() && newPwd.length >= 8,
+                        onClick = {
+                            curPwdError = Validators.required(curPwd, "A palavra-passe atual é obrigatória")
+                            newPwdError = Validators.password(newPwd)
+                            if (curPwdError == null && newPwdError == null) {
+                                onChangePassword(curPwd, newPwd); curPwd = ""; newPwd = ""
+                            }
+                        },
+                        enabled = !state.savingPassword,
                         modifier = Modifier.fillMaxWidth()
                     ) { Text(if (state.savingPassword) "A alterar…" else "Alterar palavra-passe") }
                 }

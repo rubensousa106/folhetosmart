@@ -38,6 +38,15 @@ interface CacheDao {
     @Query("SELECT * FROM cache_entries WHERE `key` = :key")
     suspend fun get(key: String): CacheEntry?
 
+    /**
+     * Versão reativa do [get]: emite a entrada atual e volta a emitir sempre que
+     * a linha muda. É o que liga o Sincronizar ao Comparar — quando o Sincronizar
+     * (re)escreve o feed na cache, o Comparar que observa este Flow re-renderiza
+     * sozinho, mesmo estando noutro separador.
+     */
+    @Query("SELECT * FROM cache_entries WHERE `key` = :key")
+    fun observe(key: String): Flow<CacheEntry?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun put(entry: CacheEntry)
 }

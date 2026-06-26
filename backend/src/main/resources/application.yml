@@ -56,6 +56,12 @@ folheto:
     # No Render define-se no painel; em dev local fica vazio.
     email: ${FOLHETO_ADMIN_EMAIL:}
     password: ${FOLHETO_ADMIN_PASSWORD:}
+  password-reset:
+    # Webhook do n8n que envia o email com a palavra-passe temporária. Vazio em
+    # dev -> o backend regista a password no log em vez de a enviar.
+    webhook-url: ${N8N_PASSWORD_RESET_WEBHOOK:}
+    # Validade da palavra-passe temporária, em minutos (1 hora por omissão).
+    ttl-minutes: ${PASSWORD_RESET_TTL_MIN:60}
 
 # ============================================================
 # ACTUATOR - Health Check para o Render

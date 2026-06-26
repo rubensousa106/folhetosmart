@@ -81,6 +81,10 @@ interface ApiService {
     @POST("api/v1/auth/register")
     suspend fun register(@Body request: RegisterRequest): AuthResponse
 
+    // Recuperação de palavra-passe: o backend gera uma temporária e envia-a por email.
+    @POST("api/v1/auth/forgot-password")
+    suspend fun forgotPassword(@Body request: ForgotPasswordRequest)
+
     // --- Privacidade RGPD (requerem JWT) ---
     @GET("api/v1/privacy/my-data")
     suspend fun exportMyData(@Header("Authorization") bearer: String): okhttp3.ResponseBody

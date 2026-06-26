@@ -8,22 +8,40 @@ import androidx.compose.runtime.setValue
 import com.folhetosmart.features.onboarding.OnboardingScreen
 
 /**
- * Fluxo de autenticação à entrada da app (Fix 1):
- * Login por omissão; "Registar" abre o registo em 2 passos.
+ * Fluxo de autenticação à entrada da app:
+ * Login por omissão; "Registar" abre o registo em 2 passos; "Esqueceste-te da
+ * palavra-passe?" abre a recuperação; entrar com uma palavra-passe temporária
+ * força a definição de uma nova antes de continuar.
  */
 @Composable
 fun AuthFlow(onAuthenticated: () -> Unit) {
-    var showRegister by remember { mutableStateOf(false) }
+    var screen by remember { mutableStateOf<AuthScreen>(AuthScreen.Login) }
 
-    if (showRegister) {
-        OnboardingScreen(
-            onFinish = onAuthenticated,
-            onBackToLogin = { showRegister = false }
-        )
-    } else {
-        LoginScreen(
+    when (val s = screen) {
+        AuthScreen.Login -> LoginScreen(
             onLoggedIn = onAuthenticated,
-            onGoToRegister = { showRegister = true }
+            onGoToRegister = { screen = AuthScreen.Register },
+            onForgotPassword = { screen = AuthScreen.Forgot },
+            onMustChangePassword = { temp -> screen = AuthScreen.SetNew(temp) }
+        )
+        AuthScreen.Register -> OnboardingScreen(
+            onFinish = onAuthenticated,
+            onBackToLogin = { screen = AuthScreen.Login }
+        )
+        AuthScreen.Forgot -> ForgotPasswordScreen(
+            onBackToLogin = { screen = AuthScreen.Login }
+        )
+        is AuthScreen.SetNew -> SetNewPasswordScreen(
+            tempPassword = s.tempPassword,
+            onDone = onAuthenticated
         )
     }
+}
+
+/** Ecrãs do fluxo de autenticação. */
+private sealed interface AuthScreen {
+    data object Login : AuthScreen
+    data object Register : AuthScreen
+    data object Forgot : AuthScreen
+    data class SetNew(val tempPassword: String) : AuthScreen
 }
