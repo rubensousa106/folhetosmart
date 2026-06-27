@@ -3,6 +3,7 @@ package com.folhetosmart.data.api
 import com.folhetosmart.BuildConfig
 import com.google.gson.FieldNamingPolicy
 import com.google.gson.GsonBuilder
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -40,10 +41,21 @@ object ApiClient {
             }
         }
 
+        // Host do NOSSO backend — o JWT só pode ser injetado em pedidos para aqui.
+        val backendHost = BuildConfig.API_BASE_URL.toHttpUrlOrNull()?.host
+
         val authInterceptor = Interceptor { chain ->
             val request = chain.request()
             val bearer = bearerProvider()
-            val withAuth = if (bearer != null && request.header("Authorization") == null) {
+            // Injeta o JWT SÓ nos pedidos ao nosso backend. NUNCA em hosts externos
+            // (ex.: links assinados do R2): além de ser fuga de credenciais, o R2
+            // rejeita um pedido que traga presigned-URL + cabeçalho Authorization
+            // (400 "Missing x-amz-content-sha256") — era isto que deixava o feed de
+            // produtos vazio (downloadFeed ia direto ao R2 com o JWT colado).
+            val withAuth = if (bearer != null &&
+                request.header("Authorization") == null &&
+                request.url.host == backendHost
+            ) {
                 request.newBuilder().header("Authorization", bearer).build()
             } else {
                 request

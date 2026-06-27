@@ -71,6 +71,17 @@ class CompareRepository(
         // Marca estes feeds como sincronizados — serve para detetar futuros feeds
         // novos no servidor (auto-sincronização + alerta "novos produtos").
         markFeedsSynced(feedKeys(urls))
+        // Resiliência: se NENHUM feed deu produtos (ex.: link assinado a falhar),
+        // recorre ao endpoint único /all (302 -> R2) para não ficar sem dados.
+        if (merged.isEmpty()) {
+            return try {
+                api.getAllFlyerProducts()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                merged
+            }
+        }
         return merged
     }
 
