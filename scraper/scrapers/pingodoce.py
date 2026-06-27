@@ -62,7 +62,12 @@ def fetch_products() -> list[dict]:
 def download_to_r2() -> str:
     """Descarrega o folheto e carrega-o no R2 com o padrão de nome do admin."""
     pdf = download_pdf()
-    ini, fim = fc.week_window()
+    # O folheto do Pingo Doce é só-imagem: as datas ("Promoção válida de X a X")
+    # leem-se por VISÃO. Recurso ao método antigo (semana segunda-domingo) se não der.
+    from pdf_extractor import extract_validity_smart  # lazy
+    ini, fim = extract_validity_smart(str(pdf), "Pingo Doce")
+    if not (ini and fim):
+        ini, fim = fc.week_window()
     key = f"Pingo Doce {ini:%d-%m-%Y} - {fim:%d-%m-%Y}.pdf"
     return fc.upload_to_r2(pdf, key)
 

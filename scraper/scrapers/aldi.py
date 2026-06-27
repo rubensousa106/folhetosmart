@@ -299,10 +299,10 @@ def _current_window() -> tuple[dt.date, dt.date]:
 
 
 def _validity(pdf_path) -> tuple[dt.date, dt.date]:
-    """Datas REAIS do folheto, lidas do texto do PDF (o Aldi tem-nas em texto);
-    recurso à janela da semana (quinta-quarta) se não conseguir ler."""
-    from pdf_extractor import extract_validity_from_pdf  # lazy
-    ini, fim = extract_validity_from_pdf(pdf_path)
+    """Datas REAIS do folheto (texto — o Aldi tem-nas em texto; visão se for
+    só-imagem); recurso à janela da semana (quinta-quarta) se não conseguir ler."""
+    from pdf_extractor import extract_validity_smart  # lazy
+    ini, fim = extract_validity_smart(pdf_path, "Aldi")
     return (ini, fim) if ini and fim else _current_window()
 
 

@@ -362,6 +362,78 @@ class PDFExtractor:
         logger.info(f"✅ Total (visão): {len(todos_produtos)} produtos extraídos do {supermarket}")
         return todos_produtos
 
+    def _prompt_validade_visao(self):
+        return (
+            "Esta imagem é uma página de um folheto de supermercado português. "
+            "Encontra a VALIDADE da PROMOÇÃO — frases tipo 'Promoção válida de … a …', "
+            "'Promoções válidas de … a …' ou 'Campanha válida de … a …' (costuma estar "
+            "em letras pequenas no rodapé). IGNORA datas de cupões, cartão de desconto "
+            "ou 'a partir de'. Devolve APENAS um JSON "
+            '{"inicio": "DD/MM/AAAA", "fim": "DD/MM/AAAA"}. '
+            'Se não encontrares, devolve {"inicio": null, "fim": null}.'
+        )
+
+    def extract_validity_por_visao(self, pdf_path, supermarket=None):
+        """Lê a validade ('Promoção válida de X a X') por VISÃO — para folhetos
+        só-imagem (cujo texto não a tem, ex.: Pingo Doce). Tenta a 1.ª página e a
+        última (info legal). (ini, fim) datetime.date ou (None, None)."""
+        if not self.client:
+            return None, None
+        try:
+            import pypdfium2 as pdfium
+        except ImportError:
+            logger.error("VISÃO-data indisponível: instala pypdfium2.")
+            return None, None
+        import base64
+        import io
+
+        try:
+            pdf = pdfium.PdfDocument(pdf_path)
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"VISÃO-data: não consegui abrir o PDF ({e})")
+            return None, None
+
+        n = len(pdf)
+        # A validade costuma estar na 1.ª página (rodapé) ou na última (info legal).
+        paginas = [0] if n else []
+        if n >= 2:
+            paginas.append(n - 1)
+        prompt = self._prompt_validade_visao()
+        try:
+            for idx in paginas:
+                try:
+                    pil = pdf[idx].render(scale=VISAO_ESCALA).to_pil().convert("RGB")
+                except Exception as e:  # noqa: BLE001
+                    logger.warning(f"VISÃO-data: página {idx+1} não renderizou ({e})")
+                    continue
+                pil.thumbnail((VISAO_MAX_LADO, VISAO_MAX_LADO))
+                buf = io.BytesIO()
+                pil.save(buf, format="PNG")
+                b64 = base64.standard_b64encode(buf.getvalue()).decode()
+                content = [
+                    {"type": "image", "source": {
+                        "type": "base64", "media_type": "image/png", "data": b64}},
+                    {"type": "text", "text": prompt},
+                ]
+                try:
+                    resp = self.client.messages.create(
+                        model=self.model, max_tokens=300, temperature=0,
+                        messages=[{"role": "user", "content": content}],
+                    )
+                    raw = resp.content[0].text.strip()
+                except Exception as e:  # noqa: BLE001
+                    logger.error(f"VISÃO-data página {idx+1}: {e}")
+                    continue
+                ini, fim = _parse_validade_json(raw)
+                if ini and fim:
+                    logger.info("✅ VISÃO-data %s: %s a %s (página %d)",
+                                supermarket or "?", ini, fim, idx + 1)
+                    return ini, fim
+        finally:
+            pdf.close()
+        logger.info("ℹ️ VISÃO-data: validade não encontrada nas páginas tentadas")
+        return None, None
+
     def _fallback_extraction(self, pdf_path):
         """Fallback: extração básica sem IA"""
         logger.warning("A usar fallback (extração básica)")
@@ -431,9 +503,10 @@ _MESES_PT = {
 def _parse_date_range(text):
     """(início, fim) datetime.date a partir de um segmento com um intervalo PT."""
     import datetime as _dt
-    # "DD [de MÊS] a DD de MÊS [de AAAA]"
+    # "DD [de MÊS] a DD [de] MÊS [de AAAA]" — o "de" antes do 2.º mês é OPCIONAL
+    # (o Pingo Doce escreve "23 a 29 junho de 2026", sem "de" antes de "junho").
     m = re.search(
-        r"(\d{1,2})(?:\s+de\s+([a-zç]+))?\s+(?:a|at[ée])\s+(\d{1,2})\s+de\s+([a-zç]+)(?:\s+de\s+(\d{4}))?",
+        r"(\d{1,2})(?:\s+de\s+([a-zç]+))?\s+(?:a|at[ée])\s+(\d{1,2})\s+(?:de\s+)?([a-zç]+)(?:\s+de\s+(\d{4}))?",
         text,
     )
     if m:
@@ -485,14 +558,85 @@ def extract_validity_from_pdf(pdf_path, max_pages=3):
     except Exception as e:  # noqa: BLE001
         logging.warning("Validade: não consegui ler o PDF (%s)", e)
         return None, None
-    low = re.sub(r"\s+", " ", text).lower()
+    return _validity_from_text(text)
 
-    # 1) Preferir o intervalo logo a seguir a "válid…" (ex.: "Promoção válida de …").
-    vm = re.search(r"v[aá]lid\w*\s+(?:de\s+)?(.{0,70})", low)
-    if vm:
-        ini, fim = _parse_date_range(vm.group(1))
+
+# Contexto que NÃO é a validade da promoção (datas de cupão/cartão de desconto).
+_CUPAO_CTX = ("cup", "cart", "desconto")
+
+
+def _validity_from_text(text):
+    """(início, fim) a partir de texto livre, PREFERINDO o padrão comum aos folhetos
+    'Promoção/Campanha válida de X a X' e IGNORANDO datas de cupão/cartão (ex.: o
+    cupão do Continente tem datas diferentes da promoção). (None, None) se não houver.
+    """
+    low = re.sub(r"\s+", " ", text or "").lower()
+    if not low:
+        return None, None
+
+    # 1) "promoç…/campanha … válid… (de) INTERVALO" — o caso preciso.
+    for m in re.finditer(r"(?:promoç\w*|campanha)\s+v[aá]lid\w*\s+(?:de\s+)?(.{0,70})", low):
+        ini, fim = _parse_date_range(m.group(1))
         if ini and fim:
             return ini, fim
 
-    # 2) Caso contrário, o primeiro intervalo de datas no texto.
-    return _parse_date_range(low)
+    # 2) Genérico "válid… (de) INTERVALO", a SALTAR o contexto de cupão/cartão.
+    for m in re.finditer(r"v[aá]lid\w*\s+(?:de\s+)?(.{0,70})", low):
+        antes = low[max(0, m.start() - 25):m.start()]
+        if any(c in antes for c in _CUPAO_CTX):
+            continue
+        ini, fim = _parse_date_range(m.group(1))
+        if ini and fim:
+            return ini, fim
+
+    return None, None
+
+
+def _parse_validade_json(raw):
+    """Resposta da visão -> (início, fim) datetime.date. Aceita
+    {"inicio": "DD/MM/AAAA", "fim": "DD/MM/AAAA"} ou texto com um intervalo PT."""
+    import datetime as _dt
+    s = (raw or "").strip()
+    if s.startswith("```json"):
+        s = s[7:]
+    elif s.startswith("```"):
+        s = s[3:]
+    if s.endswith("```"):
+        s = s[:-3]
+    s = s.strip()
+    try:
+        data = json.loads(s)
+        ini_s, fim_s = data.get("inicio"), data.get("fim")
+    except Exception:  # noqa: BLE001 — não é JSON: tenta o parser de intervalo no texto cru
+        return _parse_date_range(s.lower())
+
+    def _one(x):
+        m = re.match(r"\s*(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})", str(x or ""))
+        if not m:
+            return None
+        dd, mm, yy = m.groups()
+        year = int(yy)
+        year = year + 2000 if year < 100 else year
+        try:
+            return _dt.date(year, int(mm), int(dd))
+        except ValueError:
+            return None
+
+    return _one(ini_s), _one(fim_s)
+
+
+def extract_validity_smart(pdf_path, supermarket=None):
+    """Validade do folheto: TEXTO primeiro (0 IA); se falhar (folheto só-imagem,
+    ex.: Pingo Doce), por VISÃO (1-2 páginas). (ini, fim) datetime.date ou (None, None).
+    Degrada bem sem ANTHROPIC_API_KEY/_MODEL (devolve o do texto, ou None)."""
+    ini, fim = extract_validity_from_pdf(pdf_path)
+    if ini and fim:
+        return ini, fim
+    try:
+        extractor = PDFExtractor()
+    except Exception as e:  # noqa: BLE001 — sem API/modelo: cai no recurso do chamador
+        logging.warning("Validade por visão indisponível: %s", e)
+        return None, None
+    if not extractor.client:
+        return None, None
+    return extractor.extract_validity_por_visao(pdf_path, supermarket)

@@ -75,7 +75,12 @@ def fetch_products() -> list[dict]:
 
 def download_to_r2() -> str:
     pdf = download_pdf()
-    ini, fim = fc.week_window()  # modelo simples: semana segunda-domingo
+    # Datas REAIS do folheto ("Promoção válida de X a X"): texto e, se for só-imagem,
+    # por visão. Recurso ao método antigo (semana segunda-domingo) se não der.
+    from pdf_extractor import extract_validity_smart  # lazy
+    ini, fim = extract_validity_smart(str(pdf), "Continente")
+    if not (ini and fim):
+        ini, fim = fc.week_window()
     key = f"Continente {ini:%d-%m-%Y} - {fim:%d-%m-%Y}.pdf"
     return fc.upload_to_r2(pdf, key)
 
