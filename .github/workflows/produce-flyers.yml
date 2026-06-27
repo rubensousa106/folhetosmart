@@ -8,8 +8,12 @@ name: Produzir folhetos (R2 -> backend -> feed)
 
 on:
   schedule:
-    # Quinta-feira 09:00 UTC (~10:00 em Lisboa).
-    - cron: "0 9 * * 4"
+    # Os folhetos "viram" em dias diferentes: Aldi seg-dom (novo ~segunda),
+    # Continente/Pingo Doce ter-seg (novo ~terça). Corre SEGUNDA e TERÇA às 10:00
+    # UTC (~11:00 Lisboa) para apanhar cada um no 1.º dia. A normalização (IA) só
+    # corre se o produtor processar um folheto NOVO (gating abaixo), por isso correr
+    # em mais que um dia NÃO desperdiça IA. (Lidl/Intermarché = upload manual.)
+    - cron: "0 10 * * 1,2"
   workflow_dispatch:        # disparo manual no GitHub OU via n8n
     inputs:
       supermarket:
@@ -70,7 +74,11 @@ jobs:
             sh -c "python scrapers/aldi.py --all-regions || true; \
                    python scrapers/pingodoce.py --r2 || true; \
                    python scrapers/continente.py --r2 || true; \
-                   python drive_producer.py ${ALVO} && \
-                   python normalize_products.py && \
-                   python rotate_r2.py; \
+                   if python drive_producer.py ${ALVO}; then \
+                     echo '🆕 Folheto novo — a normalizar e a publicar o feed'; \
+                     python normalize_products.py || true; \
+                   else \
+                     echo 'ℹ️ Sem folhetos novos — normalização saltada (poupa IA)'; \
+                   fi; \
+                   python rotate_r2.py || true; \
                    python report_flyers.py || true"

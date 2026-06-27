@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import os
+import re
 import sys
 
 _ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -53,42 +54,100 @@ ALIASES: dict[str, tuple[str, ...]] = {
     "Intermarché": ("intermarche", "intermarché"),
 }
 
+# Datas no nome do PDF ("Continente 23-06-2026 - 29-06-2026.pdf"): a maior é o fim
+# da validade (a data de expiração). Aceita separadores - / . _ e ano 2 ou 4 díg.
+_DATE_RE = re.compile(r"(\d{1,2})[-/._](\d{1,2})[-/._](\d{2,4})")
+
+
+def _window(flyer_name: str) -> tuple[dt.date | None, dt.date | None]:
+    """(início, fim) da validade a partir das datas no nome do ficheiro do folheto."""
+    datas: list[dt.date] = []
+    for d, mo, y in _DATE_RE.findall(flyer_name):
+        year = int(y)
+        year = year + 2000 if year < 100 else year
+        try:
+            datas.append(dt.date(year, int(mo), int(d)))
+        except ValueError:
+            pass
+    return (min(datas), max(datas)) if datas else (None, None)
+
 
 def build_report() -> tuple[str, dict]:
-    """Texto do relatório + dados {feitos, em_falta}."""
+    """Relatório em bullets (supermercado · validade/expiração · ✅/❌) + dados estruturados."""
     nomes: list[str] = []
-    if r2_storage.is_configured():
+    r2_ok = r2_storage.is_configured()
+    if r2_ok:
         try:
             # Só os folhetos ATUAIS (no root) — ignora os arquivados em backup/.
             nomes = [p["name"] for p in r2_storage.list_pdfs()
                      if not p["name"].startswith("backup/")]
         except Exception as exc:  # noqa: BLE001
             logger.warning("Não consegui listar o R2: %s", exc)
+            r2_ok = False
 
-    feitos: dict[str, str] = {}
+    hoje = dt.date.today()
+    linhas = [
+        "📋 FolhetoSmart — relatório de folhetos",
+        f"🗓️ {hoje:%d/%m/%Y} (semana {hoje.isocalendar()[1]})",
+        "",
+        "Estado por supermercado (✅ = upload feito · ❌ = em falta):",
+    ]
+
+    feitos: list[str] = []
     em_falta: list[str] = []
+    a_expirar: list[str] = []
+    expirados: list[str] = []
+    detalhe: dict[str, dict] = {}
+
     for loja, alias in ALIASES.items():
         match = next((n for n in nomes if any(a in n.lower() for a in alias)), None)
-        if match:
-            feitos[loja] = match
-        else:
+        if not match:
+            linhas.append(f"  • ❌ {loja} — sem folheto no Cloudflare (falta upload manual na app)")
             em_falta.append(loja)
+            detalhe[loja] = {"upload": False}
+            continue
 
-    hoje = dt.date.today().strftime("%d/%m/%Y")
-    linhas = [f"📋 FolhetoSmart — relatório semanal de folhetos ({hoje})", ""]
-    linhas.append(f"✅ No Cloudflare ({len(feitos)}/{len(ALIASES)}):")
-    for loja, nome in feitos.items():
-        linhas.append(f"   • {loja} — {nome}")
-    if not feitos:
-        linhas.append("   (nenhum)")
+        feitos.append(loja)
+        ini, fim = _window(match)
+        if fim:
+            dias = (fim - hoje).days
+            if dias < 0:
+                nota = f"⛔ EXPIRADO há {abs(dias)} dia(s)"
+                expirados.append(loja)
+            elif dias == 0:
+                nota = "⚠️ expira HOJE"
+                a_expirar.append(loja)
+            elif dias == 1:
+                nota = "⚠️ expira amanhã"
+                a_expirar.append(loja)
+            elif dias <= 3:
+                nota = f"⚠️ faltam {dias} dias"
+                a_expirar.append(loja)
+            else:
+                nota = f"faltam {dias} dias"
+            linhas.append(f"  • ✅ {loja} — válido até {fim:%d/%m/%Y} ({nota})")
+            detalhe[loja] = {"upload": True, "expira": fim.isoformat(),
+                             "inicio": ini.isoformat() if ini else None, "dias_para_expirar": dias}
+        else:
+            linhas.append(f"  • ✅ {loja} — no Cloudflare (sem data legível no nome)")
+            detalhe[loja] = {"upload": True, "expira": None}
+
     linhas.append("")
-    linhas.append(f"❌ Em falta ({len(em_falta)}) — fazer upload manual pela app:")
-    for loja in em_falta:
-        linhas.append(f"   • {loja}")
-    if not em_falta:
-        linhas.append("   (nenhum — estão todos!)")
+    linhas.append(f"📦 Resumo: {len(feitos)}/{len(ALIASES)} supermercados com folheto.")
+    if expirados or a_expirar:
+        linhas.append(f"⏰ Atenção à validade: {', '.join(expirados + a_expirar)}.")
+    if em_falta:
+        linhas.append("📤 Falta upload manual (o Lidl e o Intermarché não têm scraper "
+                      f"automático): {', '.join(em_falta)}.")
+    else:
+        linhas.append("🎉 Estão todos!")
+    if not r2_ok:
+        linhas += ["", "⚠️ Nota: não consegui ler o Cloudflare R2 — os estados podem estar incompletos."]
 
-    return "\n".join(linhas), {"feitos": list(feitos), "em_falta": em_falta}
+    return "\n".join(linhas), {
+        "feitos": feitos, "em_falta": em_falta,
+        "a_expirar": a_expirar, "expirados": expirados, "detalhe": detalhe,
+    }
 
 
 def _send_to_n8n(report: str, data: dict) -> None:

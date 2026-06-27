@@ -274,3 +274,14 @@ if __name__ == "__main__":
         print(r)
     if not resultados:
         print("(nada processado)")
+
+    # Código de saída para o pipeline decidir se vale a pena NORMALIZAR (gasta IA):
+    #   0  = houve folheto(s) NOVO(s) processado(s)  -> normalizar + publicar o feed
+    #   10 = nada novo (tudo já analisado/sem folhetos) -> saltar a normalização
+    # Assim a automação pode correr vários dias sem desperdiçar IA quando nada mudou.
+    novos = sum(1 for r in resultados if r.get("enviado") and r.get("produtos"))
+    if novos:
+        print(f"\n🆕 {novos} folheto(s) novo(s) — normalização recomendada.")
+        sys.exit(0)
+    print("\nℹ️ Sem folhetos novos — normalização pode ser saltada (poupa IA).")
+    sys.exit(10)
