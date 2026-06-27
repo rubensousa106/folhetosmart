@@ -1,4 +1,14 @@
-# Automação n8n — relatório semanal de folhetos por email
+# Automações n8n do FolhetoSmart
+
+Dois workflows — importa cada `.json` no teu n8n (`https://rubensousa106.app.n8n.cloud`):
+- **`sync-folhetos-semanal.json`** — relatório semanal dos folhetos por email.
+- **`recuperar-password.json`** — envia a palavra-passe temporária de recuperação por email.
+
+Ambos são **Webhook → Gmail** (sem credenciais de R2/GitHub; só ligas o teu Gmail OAuth2).
+
+---
+
+## 1) Relatório semanal — `sync-folhetos-semanal.json`
 
 **Desenho simples e fiável (2 nós):** o pipeline já corre sozinho às quintas no
 GitHub Actions (`produce-flyers.yml`, cron quinta 09:00 UTC) — descarrega os
@@ -41,6 +51,47 @@ Pronto. À quinta, o pipeline corre e o relatório chega ao teu email automatica
 - No n8n, abre o workflow e usa **"Listen for test event"** no nó Webhook.
 - Corre localmente: `cd scraper && N8N_REPORT_WEBHOOK="<o teu webhook de teste>" python report_flyers.py`
   (em Windows define a variável antes do comando). O email deve chegar.
+
+---
+
+## 2) Recuperação de palavra-passe — `recuperar-password.json`
+
+Quando um utilizador usa **"Esqueceste-te da palavra-passe?"** na app, o **backend** gera
+uma palavra-passe temporária, grava-a, e faz um `POST` a este webhook com o corpo
+`{ email, name, temp_password, validity_minutes }`. O n8n envia o email; o utilizador
+entra com essa palavra-passe (válida **1 hora**) e a app obriga-o a definir uma nova.
+
+### Configurar (5 passos)
+
+1. **Importa** [`recuperar-password.json`](recuperar-password.json) no teu n8n.
+2. No nó **"Enviar palavra-passe (Gmail)"**, liga a tua credencial **Gmail (OAuth2)**.
+3. **Ativa** o workflow.
+4. Copia o **Production URL** do nó Webhook
+   (`https://rubensousa106.app.n8n.cloud/webhook/folhetosmart-password-reset`).
+5. No **Render** (backend), define a variável de ambiente
+   **`N8N_PASSWORD_RESET_WEBHOOK`** com esse URL
+   (opcional: `PASSWORD_RESET_TTL_MIN`, por omissão `60`). **Sem** esta variável, o
+   backend **regista a palavra-passe no log** em vez de a enviar (modo dev).
+
+### O que o email contém
+
+```
+Assunto: FolhetoSmart — a tua palavra-passe temporária
+
+Olá <nome>,
+Pediste para recuperar a tua palavra-passe no FolhetoSmart.
+Palavra-passe temporária: <gerada>
+Entra na app com este email e esta palavra-passe nos próximos 60 minutos e
+define logo uma nova palavra-passe à tua escolha.
+```
+
+### Testar agora
+
+- Na app: **Login → "Esqueceste-te da palavra-passe?"** → indica o email.
+- Ou direto ao webhook:
+  `curl -X POST "<webhook>" -H "Content-Type: application/json" -d '{"email":"tu@exemplo.pt","name":"Tu","temp_password":"ABC23xyzKM","validity_minutes":60}'`
+
+---
 
 ## Notas
 

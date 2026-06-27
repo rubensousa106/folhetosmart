@@ -28,9 +28,12 @@ class ShoppingRepository(private val shoppingDao: ShoppingDao) {
             quantity = 1
         ))
 
+    /**
+     * Ajusta a quantidade, com **mínimo de 1** — baixar até 0 NÃO remove o item
+     * (fica em 1). Para remover existe o caixote do lixo ([remove]).
+     */
     suspend fun setQuantity(item: ShoppingItemEntity, quantity: Int) {
-        if (quantity <= 0) shoppingDao.delete(item.productId)
-        else shoppingDao.upsert(item.copy(quantity = quantity))
+        shoppingDao.upsert(item.copy(quantity = quantity.coerceAtLeast(1)))
     }
 
     suspend fun remove(productId: String) = shoppingDao.delete(productId)

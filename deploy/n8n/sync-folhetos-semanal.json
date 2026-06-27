@@ -20,6 +20,8 @@
     },
     {
       "parameters": {
+        "resource": "message",
+        "operation": "send",
         "sendTo": "rubensousa106@gmail.com",
         "subject": "FolhetoSmart — relatório semanal de folhetos",
         "emailType": "text",
@@ -33,10 +35,7 @@
       "position": [
         560,
         300
-      ],
-      "credentials": {
-        "gmailOAuth2": { "id": "REPLACE", "name": "Gmail" }
-      }
+      ]
     }
   ],
   "connections": {
