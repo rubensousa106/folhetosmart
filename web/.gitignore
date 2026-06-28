@@ -3,7 +3,6 @@
 
 # builds
 /.next/
-/out/
 /build
 
 # lockfile (o CI usa "npm install"; versões fixadas no package.json)

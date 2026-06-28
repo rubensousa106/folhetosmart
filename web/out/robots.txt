@@ -1,0 +1,6 @@
+User-Agent: *
+Allow: /
+Disallow: /app/
+
+Host: https://folhetosmart.pt
+Sitemap: https://folhetosmart.pt/sitemap.xml
