@@ -1,0 +1,6 @@
+# Cloudflare Pages — projeto da web do FolhetoSmart.
+# O site é exportado estaticamente (next.config.mjs: output "export") para ./out.
+# Deploy manual:  npx wrangler pages deploy out --project-name folhetosmart-web
+name = "folhetosmart-web"
+pages_build_output_dir = "out"
+compatibility_date = "2026-06-27"
