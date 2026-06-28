@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="FolhetoSmart">
+  <rect width="512" height="512" rx="112" fill="#2E7D32"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M120 140h44l40 200h168l36-128H188"/>
+    <circle cx="214" cy="386" r="22" fill="#FFFFFF" stroke="none"/>
+    <circle cx="356" cy="386" r="22" fill="#FFFFFF" stroke="none"/>
+    <path d="M300 150l52 52" />
+  </g>
+</svg>

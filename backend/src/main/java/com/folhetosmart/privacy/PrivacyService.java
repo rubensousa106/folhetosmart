@@ -4,6 +4,7 @@ import com.folhetosmart.alerts.PriceAlertRepository;
 import com.folhetosmart.alerts.dto.AlertDto;
 import com.folhetosmart.auth.User;
 import com.folhetosmart.auth.UserRepository;
+import com.folhetosmart.shopping.ShoppingItemRepository;
 import com.folhetosmart.privacy.dto.ConsentRequest;
 import com.folhetosmart.privacy.dto.ConsentStatusResponse;
 import com.folhetosmart.privacy.dto.MyDataExport;
@@ -31,15 +32,18 @@ public class PrivacyService {
 
     private final UserRepository userRepository;
     private final PriceAlertRepository alertRepository;
+    private final ShoppingItemRepository shoppingItemRepository;
     private final ConsentLogRepository consentLogRepository;
     private final Clock clock;
 
     public PrivacyService(UserRepository userRepository,
                           PriceAlertRepository alertRepository,
+                          ShoppingItemRepository shoppingItemRepository,
                           ConsentLogRepository consentLogRepository,
                           Clock clock) {
         this.userRepository = userRepository;
         this.alertRepository = alertRepository;
+        this.shoppingItemRepository = shoppingItemRepository;
         this.consentLogRepository = consentLogRepository;
         this.clock = clock;
     }
@@ -79,6 +83,7 @@ public class PrivacyService {
                 user.getId(), ConsentLog.ACTION_ACCOUNT_DELETED, null, hashIp(clientIp)));
 
         alertRepository.deleteByUserId(user.getId());
+        shoppingItemRepository.deleteByUserId(user.getId());
 
         // Hard delete — sem período de graça.
         userRepository.delete(user);

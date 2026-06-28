@@ -14,6 +14,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 /** Segurança stateless baseada em JWT + RBAC, endurecida para produção. */
 @Configuration
@@ -36,6 +41,9 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                // CORS para o frontend web (folhetosmart.pt) — a app Android não
+                // é afetada (não é um browser, ignora CORS).
+                .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 // Cabeçalhos de segurança exigidos para a Play Store (Update 5):
                 // HSTS (1 ano, inclui subdomínios), X-Content-Type-Options: nosniff,
@@ -64,6 +72,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/**").authenticated()
                         // Geridos por utilizador autenticado
                         .requestMatchers("/api/v1/alerts/**").authenticated()
+                        .requestMatchers("/api/v1/shopping/**").authenticated()
                         .requestMatchers("/api/v1/privacy/**").authenticated()
                         .anyRequest().authenticated())
                 // Rate limiting antes da autenticação (5 tentativas / 15 min).
@@ -83,5 +92,27 @@ public class SecurityConfig {
     public PasswordEncoder passwordEncoder() {
         // Custo 12 — mínimo exigido na revisão de segurança (Update 5).
         return new BCryptPasswordEncoder(12);
+    }
+
+    /**
+     * CORS para o frontend web. A API usa Bearer JWT (não cookies), por isso
+     * {@code allowCredentials} fica a false. PATCH é incluído (endpoint da
+     * quantidade da lista de compras).
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration cfg = new CorsConfiguration();
+        cfg.setAllowedOrigins(List.of(
+                "https://folhetosmart.pt",
+                "https://www.folhetosmart.pt",
+                "http://localhost:3000"));
+        cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        cfg.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        cfg.setAllowCredentials(false);
+        cfg.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", cfg);
+        return source;
     }
 }

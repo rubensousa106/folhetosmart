@@ -1,0 +1,46 @@
+# Build + deploy da web (web/) para o Cloudflare Pages.
+#
+# Secrets necessários no repositório (Settings → Secrets and variables → Actions):
+#   - CLOUDFLARE_API_TOKEN   token com permissão "Cloudflare Pages: Edit"
+#   - CLOUDFLARE_ACCOUNT_ID  ID da conta Cloudflare
+# Variável (repo Variables), opcional — URL do backend usado no build:
+#   - NEXT_PUBLIC_API_URL    (ex.: https://folhetosmart.onrender.com)
+name: Deploy Web (Cloudflare Pages)
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "web/**"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependências
+        working-directory: web
+        run: npm install
+
+      - name: Build estático
+        working-directory: web
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+        run: npm run build
+
+      - name: Deploy para o Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: web
+          command: pages deploy out --project-name=folhetosmart-web

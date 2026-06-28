@@ -49,6 +49,15 @@ Topologia pensada para **custo zero**:
 O backend fica em `https://folhetosmart-backend.onrender.com` (ajusta o nome).
 Healthcheck: `GET /actuator/health`.
 
+> **Redeploy (web + Lista sincronizada).** Para ativar o suporte à web basta
+> voltar a fazer deploy do backend (no painel: **Manual Deploy → Deploy latest
+> commit**, ou automaticamente no push). No arranque, o Flyway aplica a migração
+> `V11__shopping_items.sql` (tabela da lista de compras) e o `SecurityConfig`
+> passa a responder com os cabeçalhos **CORS** para `folhetosmart.pt`. Não é
+> preciso adicionar variáveis de ambiente novas — as origens permitidas estão no
+> próprio `SecurityConfig`. Ver também [`deploy/cloudflare/`](../cloudflare/) para
+> o CORS do bucket R2 (necessário para o ecrã *Comparar* na web).
+
 ## 2. Configurar o processamento semanal (GitHub Actions)
 
 O workflow [`weekly-sync.yml`](../../.github/workflows/weekly-sync.yml) corre às

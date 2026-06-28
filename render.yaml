@@ -1,14 +1,15 @@
 # =====================================================================
 # Blueprint do FolhetoSmart para o plano GRATUITO do Render.
 #
-# Sobe a API (backend Spring Boot) + PostgreSQL. A extração semanal dos folhetos
-# corre no GitHub Actions (.github/workflows/produce-flyers.yml) — e não aqui —
-# porque precisa de mais RAM/tempo do que os 512 MB do plano grátis. Mantém-se o
-# modelo "processar 1×/semana no servidor (CI), ler N× pelos utilizadores".
+# Sobe a API (backend Spring Boot, via Docker) + PostgreSQL. A extração semanal
+# dos folhetos corre no GitHub Actions (.github/workflows/produce-flyers.yml) — e
+# não aqui — porque precisa de mais RAM/tempo do que os 512 MB do plano grátis.
+# Mantém-se o modelo "processar 1×/semana no servidor (CI), ler N× pelos utilizadores".
 #
-# NOTA: o runtime/buildCommand abaixo (Python/Tesseract) está desatualizado — o
-# backend é Java/Spring Boot (backend/Dockerfile). O deploy real está configurado
-# no painel do Render; rever este blueprint se voltar a usar deploy por Blueprint.
+# Redeploy: ao subir uma nova imagem, o Flyway corre as migrações pendentes no
+# arranque (ex.: V11__shopping_items.sql — lista de compras sincronizada) e o
+# SecurityConfig passa a aplicar o CORS para a web (folhetosmart.pt). Não é
+# preciso configurar mais nada para a Lista web<->telemóvel funcionar.
 #
 # Limitações do plano grátis (ver deploy/render/README.md):
 #   - o web service adormece após 15 min sem tráfego (1.º pedido é lento);
@@ -26,17 +27,37 @@ databases:
 services:
   - type: web
     name: folhetosmart-backend
-    runtime: python
-    buildCommand: |
-      apt-get update
-      apt-get install -y tesseract-ocr tesseract-ocr-por poppler-utils
-      pip install -r scraper/requirements.txt
-    startCommand: python -m backend.app
+    runtime: docker
+    repo: https://github.com/rubensousa106/folhetosmart
+    branch: master
+    region: frankfurt
+    plan: free
+    # O backend é Java/Spring Boot; build pela imagem Docker (escuta na porta 8080).
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /actuator/health
     envVars:
-      - key: PYTHONUNBUFFERED
-        value: true
-      - key: TESSERACT_CMD
-        value: /usr/bin/tesseract
+      # --- Ligação à base de dados gerida (injetada pelo Render) ---
+      - key: DB_HOST
+        fromDatabase:
+          name: folhetosmart-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: folhetosmart-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: folhetosmart-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: folhetosmart-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: folhetosmart-db
+          property: password
 
       # --- Segurança ---
       - key: FOLHETO_REQUIRE_HTTPS
@@ -64,4 +85,3 @@ services:
       # --- JVM dentro dos 512 MB do plano grátis ---
       - key: JAVA_TOOL_OPTIONS
         value: "-XX:MaxRAMPercentage=75.0"
-

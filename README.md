@@ -36,8 +36,14 @@ todos os utilizadores leem o resultado já preparado:
 | Produtor + IA | Python 3.12 · pdfplumber · Claude API · boto3 (R2) | [`scraper/`](scraper/) |
 | Backend | Java 21 · Spring Boot 3 · Spring Security (JWT + RBAC) · Flyway | [`backend/`](backend/) |
 | App | Kotlin · Jetpack Compose · Material 3 · Retrofit2 · Room | [`android/`](android/) |
+| Web | Next.js 14 · TypeScript · Tailwind CSS (SSG + SEO) | [`web/`](web/) |
 | Base de dados | PostgreSQL 16 | [`db/init.sql`](db/init.sql) |
 | Armazenamento | Cloudflare R2 (folhetos PDF + feed JSON) | — |
+
+> **Web** (`web/`): mesmo backend e mesma conta da app. Páginas públicas em HTML
+> estático (otimizadas para SEO) e área autenticada (`/app`) no cliente. A **Lista
+> de compras** é agora guardada no servidor (`/api/v1/shopping`), por isso sincroniza
+> entre a web e o telemóvel. Ver [`web/README.md`](web/README.md).
 
 ## Arranque rápido (dev local)
 
@@ -74,6 +80,8 @@ POST   /api/v1/auth/register | /auth/login
 GET    /api/v1/products/all              -- feed normalizado (302 → R2)   (JWT)
 GET    /api/v1/users/me  ·  PUT /users/me   -- perfil + distrito/cidade   (JWT)
 GET    /api/v1/alerts  ·  POST /alerts  ·  DELETE /alerts/{id}            (JWT)
+GET    /api/v1/shopping ·  POST /shopping  -- lista de compras (sincroniza)  (JWT)
+PATCH  /api/v1/shopping/{id}/quantity  ·  DELETE /shopping/{id}           (JWT)
 GET    /api/v1/privacy/my-data  ·  DELETE /privacy/my-account  (RGPD)     (JWT)
 POST   /api/v1/admin/flyer-upload-url    -- link assinado p/ upload ao R2 (ADMIN)
 POST   /api/v1/admin/products  ·  POST /admin/feed-url                    (ADMIN/produtor)
