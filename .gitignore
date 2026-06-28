@@ -25,6 +25,11 @@ android/local.properties
 *.aab
 .cxx/
 
+# Web (Next.js) — saída do build (gerada pelo `npm run build`)
+web/node_modules/
+web/.next/
+web/out/
+
 # IDEs
 .idea/
 *.iml

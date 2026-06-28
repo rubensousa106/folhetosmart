@@ -32,6 +32,7 @@ export function SiteFooter() {
           <h2 className="mb-3 text-sm font-semibold text-ink">Produto</h2>
           <ul className="space-y-2 text-sm text-ink/70">
             <li><Link href="/como-funciona/" className="hover:text-brand">Como funciona</Link></li>
+            <li><Link href="/poupar-no-supermercado/" className="hover:text-brand">Como poupar no supermercado</Link></li>
             <li><Link href="/entrar/" className="hover:text-brand">Entrar</Link></li>
             <li><Link href="/registar/" className="hover:text-brand">Criar conta</Link></li>
             <li>

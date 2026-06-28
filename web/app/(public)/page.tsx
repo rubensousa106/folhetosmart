@@ -160,6 +160,16 @@ export default function HomePage() {
             </Link>
           ))}
         </div>
+        <p className="mt-6 text-center text-sm text-ink/70">
+          Novo por aqui? Vê o nosso{" "}
+          <Link
+            href="/poupar-no-supermercado/"
+            className="font-medium text-brand hover:underline"
+          >
+            guia para poupar no supermercado
+          </Link>
+          .
+        </p>
       </section>
 
       {/* FAQ */}

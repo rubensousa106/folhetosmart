@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ArrowRight, Star, Tag, CalendarClock } from "lucide-react";
 import { SITE, SUPERMARKETS, getSupermarket } from "@/lib/site";
-import { pageMetadata, faqJsonLd } from "@/lib/seo";
+import { pageMetadata, faqJsonLd, breadcrumbJsonLd } from "@/lib/seo";
 import { JsonLd } from "@/components/JsonLd";
 
 /** Gera uma página estática por supermercado (SEO por palavra-chave). */
@@ -50,11 +50,21 @@ export default function SupermercadoPage({
       q: `Posso comparar o ${sm.name} com outros supermercados?`,
       a: `Sim. O FolhetoSmart compara o ${sm.name} com Lidl, Continente, Pingo Doce, Intermarché e Aldi, produto a produto, mostrando o preço mais baixo em destaque.`,
     },
+    {
+      q: `Comparar o folheto ${sm.name} no FolhetoSmart é grátis?`,
+      a: `Sim, é grátis. Cria uma conta gratuita e compara os preços do folheto ${sm.name} com os outros supermercados sempre que precisares.`,
+    },
   ];
 
   return (
     <>
       <JsonLd data={faqJsonLd(faq)} />
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Início", path: "/" },
+          { name: `Folheto ${sm.name}`, path: `/supermercados/${sm.slug}` },
+        ])}
+      />
       <div className="container-page max-w-3xl py-12 sm:py-16">
         <nav className="text-sm text-ink/60">
           <Link href="/" className="hover:text-brand">Início</Link>
@@ -91,6 +101,16 @@ export default function SupermercadoPage({
           <Link href="/registar/" className="btn-primary mt-4">
             Comparar preços agora <ArrowRight className="h-4 w-4" />
           </Link>
+          <p className="mt-4 text-sm text-ink/70">
+            Vê também o nosso{" "}
+            <Link
+              href="/poupar-no-supermercado/"
+              className="font-medium text-brand hover:underline"
+            >
+              guia para poupar no supermercado
+            </Link>{" "}
+            com 7 dicas práticas.
+          </p>
         </div>
 
         <section className="mt-12">
