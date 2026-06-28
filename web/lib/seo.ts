@@ -82,3 +82,17 @@ export function faqJsonLd(items: { q: string; a: string }[]) {
     })),
   };
 }
+
+/** JSON-LD: BreadcrumbList para subpáginas (rich results de navegação). */
+export function breadcrumbJsonLd(items: { name: string; path: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((it, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: it.name,
+      item: `${SITE.url}${it.path}`,
+    })),
+  };
+}
