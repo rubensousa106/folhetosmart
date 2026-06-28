@@ -12,7 +12,6 @@ on:
     branches: [master]
     paths:
       - "web/**"
-      - ".github/workflows/deploy-web.yml"
   workflow_dispatch:
 
 jobs:
@@ -43,4 +42,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: web
-          command: pages deploy out --project-name=folhetosmart-web
+          command: pages deploy out --project-name=folhetosmart-web --create
