@@ -202,6 +202,28 @@ data class AlertDto(
     val createdAt: String? = null
 )
 
+// --- Lista de compras (sincronizada com o servidor: web <-> telemóvel) -----
+data class ShoppingItemDto(
+    val id: String,
+    val produto: String,
+    val supermercado: String,
+    val preco: Double,
+    val quantity: Int,
+    val createdAt: String? = null,
+    val updatedAt: String? = null
+)
+
+data class ShoppingItemRequest(
+    val produto: String,
+    val supermercado: String,
+    val preco: Double,
+    val quantity: Int? = null
+)
+
+data class ShoppingQuantityRequest(val quantity: Int)
+
+data class ShoppingSyncRequest(val items: List<ShoppingItemRequest>)
+
 // --- Administração (painel só-ADMIN) ---------------------------------------
 data class AdminUploadResponseDto(
     val syncRunId: String,

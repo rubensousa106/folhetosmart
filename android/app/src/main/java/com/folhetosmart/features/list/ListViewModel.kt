@@ -41,6 +41,11 @@ class ListViewModel(private val repository: ShoppingRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(ListUiState())
     val uiState: StateFlow<ListUiState> = _uiState.asStateFlow()
 
+    init {
+        // Sincroniza com o servidor ao abrir a Lista (partilha web <-> telemóvel).
+        viewModelScope.launch { repository.sync() }
+    }
+
     fun changeQuantity(item: ShoppingItemEntity, delta: Int) {
         viewModelScope.launch {
             repository.setQuantity(item, item.quantity + delta)

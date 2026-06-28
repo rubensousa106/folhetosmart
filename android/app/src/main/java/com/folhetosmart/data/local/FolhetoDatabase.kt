@@ -22,14 +22,16 @@ data class CacheEntry(
     @ColumnInfo(name = "updated_at") val updatedAt: Long
 )
 
-/** Item da lista de compras (persistido localmente). */
+/** Item da lista de compras (cache local; sincronizado com o servidor). */
 @Entity(tableName = "shopping_items")
 data class ShoppingItemEntity(
     @PrimaryKey @ColumnInfo(name = "product_id") val productId: String,
     @ColumnInfo(name = "display_name") val displayName: String,
     val supermercado: String? = null,
     val preco: Double = 0.0,
-    val quantity: Int
+    val quantity: Int,
+    /** UUID do item no backend (para PATCH/DELETE); null = ainda não sincronizado. */
+    @ColumnInfo(name = "server_id") val serverId: String? = null
 )
 
 @Dao
@@ -57,6 +59,10 @@ interface ShoppingDao {
     @Query("SELECT * FROM shopping_items ORDER BY supermercado, display_name")
     fun observeItems(): Flow<List<ShoppingItemEntity>>
 
+    /** Lê a lista atual de forma não-reativa (para a sincronização com o servidor). */
+    @Query("SELECT * FROM shopping_items")
+    suspend fun getAll(): List<ShoppingItemEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(item: ShoppingItemEntity)
 
@@ -69,7 +75,7 @@ interface ShoppingDao {
 
 @Database(
     entities = [CacheEntry::class, ShoppingItemEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class FolhetoDatabase : RoomDatabase() {

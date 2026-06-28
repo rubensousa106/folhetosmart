@@ -8,6 +8,7 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Headers
 import retrofit2.http.Multipart
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Part
@@ -73,6 +74,25 @@ interface ApiService {
         @Header("Authorization") bearer: String,
         @Body request: ChangeEmailRequest
     ): AuthResponse
+
+    // --- Lista de compras (sincronizada; o JWT é injetado pelo interceptor) ---
+    @GET("api/v1/shopping")
+    suspend fun shoppingList(): List<ShoppingItemDto>
+
+    @POST("api/v1/shopping")
+    suspend fun shoppingUpsert(@Body request: ShoppingItemRequest): ShoppingItemDto
+
+    @PATCH("api/v1/shopping/{id}/quantity")
+    suspend fun shoppingSetQuantity(
+        @Path("id") id: String,
+        @Body request: ShoppingQuantityRequest
+    ): ShoppingItemDto
+
+    @DELETE("api/v1/shopping/{id}")
+    suspend fun shoppingDelete(@Path("id") id: String)
+
+    @PUT("api/v1/shopping")
+    suspend fun shoppingReplaceAll(@Body request: ShoppingSyncRequest): List<ShoppingItemDto>
 
     // --- Autenticação ---
     @POST("api/v1/auth/login")

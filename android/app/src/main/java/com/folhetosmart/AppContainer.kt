@@ -34,7 +34,7 @@ class AppContainer(context: Context) {
 
     val adminRepository = AdminRepository(api)
     val compareRepository = CompareRepository(api, database.cacheDao())
-    val shoppingRepository = ShoppingRepository(database.shoppingDao())
+    val shoppingRepository = ShoppingRepository(api, database.shoppingDao())
     val alertsRepository = AlertsRepository(api, tokenStore)
     val privacyRepository = PrivacyRepository(api, tokenStore, database.shoppingDao())
     val userRepository = UserRepository(api, tokenStore)
