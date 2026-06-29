@@ -141,12 +141,13 @@ public class ProductController {
     }
 
     /**
-     * GET /api/v1/products/highlights — amostra PÚBLICA (até 8) de ofertas da
-     * semana, para o "isco" do site (visitantes sem sessão). Limitada e variada
-     * de propósito — NÃO é a base completa (essa é privada/autenticada).
+     * Constrói TODAS as ofertas válidas desta semana a partir da BD
+     * (latest_products, payloads por supermercado que o produtor envia em
+     * POST /api/v1/admin/products), SEM tocar no R2. Base partilhada por
+     * /highlights (amostra pública) e /offerings (lista completa, autenticada).
+     * Ignora linhas de feed (__feed_url__) e produtos sem nome ou sem preço.
      */
-    @GetMapping("/highlights")
-    public List<FlyerOfferingDto> highlights() {
+    private List<FlyerOfferingDto> buildOfferingsFromDb() {
         List<FlyerOfferingDto> offerings = new ArrayList<>();
         for (LatestProducts lp : latestProductsRepository.findAll()) {
             String key = lp.getSupermarket();
@@ -171,8 +172,32 @@ public class ProductController {
                 // payload inválido não trava os outros
             }
         }
+        return offerings;
+    }
+
+    /**
+     * GET /api/v1/products/highlights — amostra PÚBLICA (até 8) de ofertas da
+     * semana, para o "isco" do site (visitantes sem sessão). Limitada e variada
+     * de propósito — NÃO é a base completa (essa é privada/autenticada).
+     */
+    @GetMapping("/highlights")
+    public List<FlyerOfferingDto> highlights() {
+        List<FlyerOfferingDto> offerings = buildOfferingsFromDb();
         Collections.shuffle(offerings);
         return offerings.stream().limit(8).toList();
+    }
+
+    /**
+     * GET /api/v1/products/offerings — TODAS as ofertas válidas desta semana,
+     * servidas a partir da BD (NUNCA do R2). É o que a app WEB (browser) usa no
+     * "Comparar": autenticado (JWT, ver SecurityConfig), sem expor o ficheiro
+     * .json nem os links assinados do R2, para não facilitar a cópia da base.
+     * A app Android continua a usar /feeds e /all (download nativo do R2, sem o
+     * problema de CORS que o browser teria).
+     */
+    @GetMapping("/offerings")
+    public List<FlyerOfferingDto> offerings() {
+        return buildOfferingsFromDb();
     }
 
     /**
