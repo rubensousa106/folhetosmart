@@ -3,6 +3,7 @@ package com.folhetosmart
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import com.google.android.gms.ads.MobileAds
 
 class FolhetoSmartApp : Application() {
 
@@ -13,6 +14,9 @@ class FolhetoSmartApp : Application() {
         super.onCreate()
         container = AppContainer(this)
         createNotificationChannels()
+        // Inicializa o AdMob. Os anúncios só são pedidos após o consentimento (UMP,
+        // tratado na MainActivity) e nunca são mostrados ao ADMIN.
+        MobileAds.initialize(this)
     }
 
     private fun createNotificationChannels() {

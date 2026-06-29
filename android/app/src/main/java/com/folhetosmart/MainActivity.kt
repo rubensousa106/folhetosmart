@@ -11,6 +11,8 @@ import androidx.compose.runtime.setValue
 import com.folhetosmart.features.auth.AuthFlow
 import com.folhetosmart.ui.navigation.FolhetoSmartRoot
 import com.folhetosmart.ui.theme.FolhetoSmartTheme
+import com.google.android.ump.ConsentRequestParameters
+import com.google.android.ump.UserMessagingPlatform
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -21,6 +23,9 @@ class MainActivity : ComponentActivity() {
         val container = (application as FolhetoSmartApp).container
         // Destino vindo de uma notificação push (ex.: "novos produtos" → "sync").
         val startRoute = intent?.getStringExtra(EXTRA_OPEN_ROUTE)
+
+        // Pede/mostra o consentimento de publicidade (RGPD) se for necessário.
+        requestAdsConsent()
 
         setContent {
             FolhetoSmartTheme {
@@ -50,6 +55,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * Consentimento de publicidade (UMP/RGPD): atualiza a informação de consentimento
+     * e mostra o formulário se for exigido (ex.: utilizadores na UE). Falhas são
+     * ignoradas — nesse caso a app segue sem mostrar anúncios personalizados.
+     */
+    private fun requestAdsConsent() {
+        val consentInformation = UserMessagingPlatform.getConsentInformation(this)
+        val params = ConsentRequestParameters.Builder().build()
+        consentInformation.requestConsentInfoUpdate(
+            this,
+            params,
+            { UserMessagingPlatform.loadAndShowConsentFormIfRequired(this) { } },
+            { }
+        )
     }
 
     companion object {

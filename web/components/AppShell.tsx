@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { Search, ListChecks, User, LogOut, Loader2 } from "lucide-react";
 import { Brand } from "./Brand";
 import { useAuth, useRequireAuth } from "@/lib/auth";
+import { AdUnit } from "./AdSense";
+import { AD_SLOTS } from "@/lib/ads";
 
 const NAV = [
   { href: "/app/comparar/", label: "Comparar", icon: Search },
@@ -59,6 +61,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="container-page flex-1 py-6">{children}</main>
+
+      {/* Anúncio — só para utilizadores USER (o ADMIN não vê anúncios) */}
+      {session.role !== "ADMIN" && AD_SLOTS.appInline && (
+        <div className="container-page pb-4">
+          <AdUnit slot={AD_SLOTS.appInline} format="horizontal" />
+        </div>
+      )}
 
       {/* Navegação inferior (mobile) */}
       <nav className="sticky bottom-0 z-30 grid grid-cols-3 border-t border-outline/60 bg-white sm:hidden">

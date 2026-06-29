@@ -4,6 +4,7 @@ import { SITE } from "@/lib/site";
 import { organizationJsonLd } from "@/lib/seo";
 import { JsonLd } from "@/components/JsonLd";
 import { AuthProvider } from "@/lib/auth";
+import { AdScript } from "@/components/AdSense";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
@@ -57,6 +58,7 @@ export default function RootLayout({
       <body>
         <JsonLd data={organizationJsonLd()} />
         <AuthProvider>{children}</AuthProvider>
+        <AdScript />
       </body>
     </html>
   );

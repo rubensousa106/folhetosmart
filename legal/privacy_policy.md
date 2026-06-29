@@ -2,7 +2,7 @@
 
 # Política de Privacidade — FolhetoSmart
 
-**Versão 1.0 · Última atualização: 10 de junho de 2026**
+**Versão 1.1 · Última atualização: 29 de junho de 2026**
 **URL pública: https://folhetosmart.pt/privacidade**
 
 A tua privacidade é importante para nós. Esta política explica, de forma
@@ -32,9 +32,10 @@ Recolhemos apenas os dados estritamente necessários ao funcionamento da app:
 | Token de notificações (FCM) | Se ativares notificações | Entrega de alertas de preço no teu dispositivo |
 | Registos de consentimento (data, versão dos termos, hash do IP) | Ao aceitares os termos | Prova de consentimento exigida por lei (Art. 7.º RGPD) |
 
-**Não recolhemos**: localização GPS, contactos, fotografias, ficheiros,
-dados financeiros, nem identificadores de publicidade. A app pode ser usada
-sem conta — nesse caso não recolhemos qualquer dado pessoal.
+**Não recolhemos diretamente**: localização GPS, contactos, fotografias,
+ficheiros nem dados financeiros. A app e o site podem ser usados sem conta —
+nesse caso não recolhemos dados de conta; no entanto, para nos financiarmos,
+mostramos publicidade que pode usar cookies e identificadores (ver secção 6).
 
 ## 3. Base legal do tratamento
 
@@ -73,22 +74,43 @@ Ao abrigo dos Art. 15.º a 21.º do RGPD, tens direito a:
 Para exercer qualquer direito também podes escrever para
 **privacidade@folhetosmart.pt** — respondemos no prazo máximo de 30 dias.
 
-## 6. Transferências internacionais de dados
+## 6. Publicidade e cookies
+
+O FolhetoSmart é gratuito e financia-se através de **publicidade**. Para isso
+usamos o **Google AdSense** (no site) e o **Google AdMob** (na aplicação),
+serviços da Google LLC.
+
+- Estes serviços podem usar **cookies e identificadores de publicidade** para
+  apresentar anúncios e medir o seu desempenho.
+- No Espaço Económico Europeu, **só apresentamos anúncios personalizados com o
+  teu consentimento**, pedido antes de os anúncios serem carregados. Podes
+  aceitar, recusar ou escolher apenas anúncios não personalizados, e alterar a
+  tua escolha a qualquer momento.
+- **Não partilhamos** com a Google o teu email, a tua lista de compras nem os
+  teus alertas.
+- Os utilizadores com perfil de administração não veem publicidade.
+
+Podes gerir as preferências de anúncios da Google em
+**https://adssettings.google.com** e saber mais em
+**https://policies.google.com/technologies/ads**.
+
+## 7. Transferências internacionais de dados
 
 As notificações push são entregues através do **Firebase Cloud Messaging
 (Google LLC)**, o que pode implicar a transferência do token de notificações
 para servidores nos Estados Unidos da América. Esta transferência é
 realizada ao abrigo do EU-U.S. Data Privacy Framework e das Cláusulas
 Contratuais-Tipo da Comissão Europeia, que garantem um nível de proteção
-adequado. Nenhum outro dado pessoal sai do Espaço Económico Europeu.
+adequado. À exceção da publicidade (ver secção 6), nenhum outro dado pessoal
+sai do Espaço Económico Europeu.
 
-## 7. Contacto para questões de privacidade
+## 8. Contacto para questões de privacidade
 
 Para qualquer questão sobre esta política ou sobre os teus dados:
 
 > **privacidade@folhetosmart.pt**
 
-## 8. Alterações a esta política
+## 9. Alterações a esta política
 
 Quando alterarmos esta política, atualizamos a versão e a data no topo deste
 documento e notificamos-te na app antes de a alteração produzir efeitos.

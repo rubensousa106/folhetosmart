@@ -1,6 +1,7 @@
 package com.folhetosmart.ui.navigation
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
@@ -35,6 +36,7 @@ import com.folhetosmart.features.legal.TermsOfServiceScreen
 import com.folhetosmart.features.list.ListScreen
 import com.folhetosmart.features.settings.SettingsScreen
 import com.folhetosmart.features.sync.SyncScreen
+import com.folhetosmart.ui.ads.AdmobBanner
 
 /** Rotas fora da bottom navigation (documentos legais). */
 const val ROUTE_PRIVACY_POLICY = "privacy_policy"
@@ -90,7 +92,12 @@ fun FolhetoSmartRoot(
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
+            Column {
+                // Anúncio (AdMob) — só para utilizadores USER; o ADMIN não vê.
+                if (!isAdmin) {
+                    AdmobBanner()
+                }
+                NavigationBar {
                 destinations.forEach { dest ->
                     NavigationBarItem(
                         selected = currentRoute == dest.route,
@@ -107,6 +114,7 @@ fun FolhetoSmartRoot(
                         label = { Text(stringResource(dest.labelRes)) }
                     )
                 }
+            }
             }
         }
     ) { padding ->

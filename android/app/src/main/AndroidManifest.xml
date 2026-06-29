@@ -9,6 +9,9 @@
     <!-- Notificações (Android 13+) — pedida em runtime com diálogo explicativo -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Identificador de publicidade (AdMob) -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
+
     <!-- NÃO declarar: localização GPS, câmara, contactos, armazenamento.   -->
     <!-- A Play Store penaliza permissões excessivas. A cidade do utilizador -->
     <!-- é escolhida manualmente no onboarding — não requer permissão de    -->
@@ -22,6 +25,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FolhetoSmart"
         android:usesCleartextTraffic="true">
+
+        <!-- AdMob: ID da aplicação (publicidade) -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-6792201256188159~1024993976" />
 
         <activity
             android:name=".MainActivity"
