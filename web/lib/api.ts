@@ -73,7 +73,13 @@ async function rawRequest(path: string, init: RequestInit, withAuth: boolean) {
   if (withAuth && tokenStore.access) {
     headers.set("Authorization", `Bearer ${tokenStore.access}`);
   }
-  return fetch(`${SITE.apiUrl}${path}`, { ...init, headers });
+  try {
+    return await fetch(`${SITE.apiUrl}${path}`, { ...init, headers });
+  } catch {
+    // fetch rejeita (sem rede / servidor inacessível / CORS) sem chegar a haver
+    // resposta — convertemos num ApiError com mensagem amigável (status 0).
+    throw new ApiError(0, friendlyStatus(0));
+  }
 }
 
 async function refreshTokens(): Promise<boolean> {
@@ -90,15 +96,47 @@ async function refreshTokens(): Promise<boolean> {
   return true;
 }
 
+/**
+ * Mensagem PT-PT para o utilizador a partir do estado HTTP — NUNCA mostra o
+ * número do erro ("erros numerais não são bons para o utilizador"). Espelha o
+ * tratamento da app Android (LoginViewModel/ApiErrors).
+ */
+function friendlyStatus(status: number): string {
+  switch (status) {
+    case 0:
+      return "Sem ligação ao servidor. Verifica a tua internet e tenta novamente.";
+    case 400:
+    case 422:
+      return "Há dados inválidos. Verifica o que escreveste e tenta de novo.";
+    case 401:
+      return "Email ou palavra-passe incorretos.";
+    case 403:
+      return "Não tens permissão para fazer isto.";
+    case 404:
+      return "Não foi possível contactar o serviço. Tenta novamente mais tarde.";
+    case 409:
+      return "Esse email já está registado. Tenta entrar.";
+    case 429:
+      return "Demasiadas tentativas. Aguarda um pouco e tenta novamente.";
+    default:
+      // 405, 5xx e afins são problemas do serviço, não do utilizador.
+      return "O serviço está temporariamente indisponível. Tenta novamente dentro de momentos.";
+  }
+}
+
+/** Lê o corpo do erro: usa a mensagem PT do backend; senão, a mensagem por estado. */
 async function parseError(res: Response): Promise<never> {
-  let message = `Erro ${res.status}`;
+  let serverMsg: string | null = null;
   try {
     const body = await res.json();
-    if (body?.message) message = body.message;
+    if (typeof body?.message === "string") {
+      // Remove o prefixo técnico de validação (igual ao serverMessage() da app).
+      serverMsg = body.message.replace(/^Dados inválidos\s*[—-]\s*/i, "").trim() || null;
+    }
   } catch {
-    /* corpo não-JSON */
+    /* corpo não-JSON (ex.: HTML do 404/405) — usamos a mensagem por estado */
   }
-  throw new ApiError(res.status, message);
+  throw new ApiError(res.status, serverMsg ?? friendlyStatus(res.status));
 }
 
 /** Pedido autenticado com renovação automática do token em 401. */

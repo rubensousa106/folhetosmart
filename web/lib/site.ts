@@ -1,12 +1,25 @@
 /** Configuração central do site (SEO, marca, dados de supermercados). */
 
+/**
+ * Backend REST. Vem de NEXT_PUBLIC_API_URL no build; se essa variável faltar OU
+ * vier vazia (ex.: criada sem valor no CI), recorremos ao backend de produção.
+ * Com `??` a string vazia "passava" — e os pedidos iam para uma URL relativa, ou
+ * seja, para o próprio site estático (Cloudflare Pages), que responde 405 a um
+ * POST. Removemos também a "/" final para não duplicar barras nos caminhos.
+ */
+const ENV_API_URL = process.env.NEXT_PUBLIC_API_URL?.trim();
+const API_URL = (ENV_API_URL && ENV_API_URL.length > 0
+  ? ENV_API_URL
+  : "https://folhetosmart.onrender.com"
+).replace(/\/+$/, "");
+
 export const SITE = {
   name: "FolhetoSmart",
   tagline: "Poupa sempre",
   /** URL público canónico (atualizar quando o domínio estiver ligado). */
   url: "https://folhetosmart.pt",
-  /** Backend REST (sobreposto por NEXT_PUBLIC_API_URL no build). */
-  apiUrl: process.env.NEXT_PUBLIC_API_URL ?? "https://folhetosmart.onrender.com",
+  /** Backend REST (ver API_URL acima). */
+  apiUrl: API_URL,
   locale: "pt-PT",
   themeColor: "#2E7D32",
   playStoreUrl: "https://play.google.com/store/apps/details?id=pt.folhetosmart.app",

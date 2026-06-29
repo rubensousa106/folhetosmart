@@ -33,7 +33,8 @@ jobs:
       - name: Build estático
         working-directory: web
         env:
-          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          # Se a variável não existir (ou estiver vazia), usa o backend de produção.
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://folhetosmart.onrender.com' }}
         run: npm run build
 
       - name: Garantir que o projeto Pages existe (cria na 1.ª vez; ignora se já existe)
