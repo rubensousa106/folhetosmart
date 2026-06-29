@@ -1,0 +1,15 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2E7D32"/>
+      <stop offset="1" stop-color="#1B5E20"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="90" y="148" width="64" height="8" rx="4" fill="#A5D6A7"/>
+  <text x="90" y="132" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="600" fill="#C8E6C9">Comparador de folhetos · Portugal</text>
+  <text x="84" y="298" font-family="Arial, Helvetica, sans-serif" font-size="118" font-weight="800" fill="#FFFFFF">FolhetoSmart</text>
+  <text x="90" y="388" font-family="Arial, Helvetica, sans-serif" font-size="50" font-weight="500" fill="#E8F5E9">Descobre onde é mais barato. Poupa sempre.</text>
+  <text x="90" y="518" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="400" fill="#A5D6A7">Lidl · Continente · Pingo Doce · Intermarché · Aldi</text>
+  <text x="90" y="566" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#FFFFFF">100% gratuito</text>
+</svg>

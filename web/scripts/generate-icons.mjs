@@ -23,4 +23,10 @@ for (const [svg, size, name] of jobs) {
   await sharp(svg, { density: 384 }).resize(size, size).png().toFile(out(name));
   console.log(`✓ ${name} (${size}px)`);
 }
+
+// Imagem Open Graph (partilha em redes sociais) — 1200x630.
+const og = await readFile(join(root, "assets/og.svg"));
+await sharp(og, { density: 200 }).resize(1200, 630).png().toFile(out("og.png"));
+console.log("✓ og.png (1200x630)");
+
 console.log("Ícones gerados em web/public/");

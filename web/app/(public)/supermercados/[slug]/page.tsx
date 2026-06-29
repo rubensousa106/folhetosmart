@@ -1,10 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ArrowRight, Star, Tag, CalendarClock } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { SITE, SUPERMARKETS, getSupermarket } from "@/lib/site";
 import { pageMetadata, faqJsonLd, breadcrumbJsonLd } from "@/lib/seo";
 import { JsonLd } from "@/components/JsonLd";
+import { WeekHighlights } from "@/components/WeekHighlights";
 
 /** Gera uma página estática por supermercado (SEO por palavra-chave). */
 export function generateStaticParams() {
@@ -77,19 +78,6 @@ export default function SupermercadoPage({
         </h1>
         <p className="mt-4 text-lg text-ink/70">{sm.blurb}</p>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-3">
-          {[
-            { icon: Star, t: "Preço mais baixo em destaque" },
-            { icon: Tag, t: "Promoções assinaladas" },
-            { icon: CalendarClock, t: `Folheto à ${sm.flyerDay}` },
-          ].map((b) => (
-            <div key={b.t} className="rounded-2xl border border-outline/60 bg-white p-5">
-              <b.icon className="h-6 w-6 text-brand" />
-              <p className="mt-3 text-sm font-medium text-ink">{b.t}</p>
-            </div>
-          ))}
-        </div>
-
         <div className="mt-10 rounded-2xl bg-savings-bg p-6">
           <h2 className="text-lg font-bold text-brand-dark">
             Compara o {sm.name} com os outros supermercados
@@ -112,6 +100,17 @@ export default function SupermercadoPage({
             com 7 dicas práticas.
           </p>
         </div>
+
+        <section className="mt-12">
+          <h2 className="text-xl font-bold text-ink">Algumas ofertas desta semana</h2>
+          <p className="mt-2 text-sm text-ink/70">
+            Uma amostra do que está em promoção. Cria conta para veres todos os preços
+            e comparares o {sm.name} com os outros supermercados.
+          </p>
+          <div className="mt-6">
+            <WeekHighlights />
+          </div>
+        </section>
 
         <section className="mt-12">
           <h2 className="text-xl font-bold text-ink">Perguntas frequentes</h2>
