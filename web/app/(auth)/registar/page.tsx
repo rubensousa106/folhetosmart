@@ -5,13 +5,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { UserPlus, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { ApiError } from "@/lib/api";
+import { ApiError, users } from "@/lib/api";
 
 export default function RegistarPage() {
   const { register } = useAuth();
   const router = useRouter();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [district, setDistrict] = useState("");
+  const [city, setCity] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -19,6 +22,10 @@ export default function RegistarPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!name.trim()) {
+      setError("O nome é obrigatório.");
+      return;
+    }
     if (password.length < 8) {
       setError("A palavra-passe tem de ter pelo menos 8 caracteres.");
       return;
@@ -30,6 +37,16 @@ export default function RegistarPage() {
     setLoading(true);
     try {
       await register(email, password);
+      // Guarda o nome logo a seguir (a conta já tem sessão) — como na app.
+      try {
+        await users.updateProfile(
+          name.trim(),
+          district.trim() || null,
+          city.trim() || null,
+        );
+      } catch {
+        /* não bloqueia o registo; o nome pode ser definido na conta */
+      }
       router.replace("/app/comparar/");
     } catch (err) {
       setError(
@@ -51,6 +68,14 @@ export default function RegistarPage() {
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <div>
+          <label htmlFor="name" className="mb-1 block text-sm font-medium text-ink">Nome completo</label>
+          <input
+            id="name" type="text" autoComplete="name" required
+            className="input" value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+        <div>
           <label htmlFor="email" className="mb-1 block text-sm font-medium text-ink">Email</label>
           <input
             id="email" type="email" autoComplete="email" required
@@ -67,6 +92,28 @@ export default function RegistarPage() {
           />
           <p className="mt-1 text-xs text-ink/60">Pelo menos 8 caracteres.</p>
         </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="district" className="mb-1 block text-sm font-medium text-ink">
+              Distrito <span className="font-normal text-ink/50">(opcional)</span>
+            </label>
+            <input
+              id="district" type="text" className="input" value={district}
+              onChange={(e) => setDistrict(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="city" className="mb-1 block text-sm font-medium text-ink">
+              Cidade <span className="font-normal text-ink/50">(opcional)</span>
+            </label>
+            <input
+              id="city" type="text" className="input" value={city}
+              onChange={(e) => setCity(e.target.value)}
+            />
+          </div>
+        </div>
+        <p className="-mt-2 text-xs text-ink/50">A zona define o folheto regional do Aldi.</p>
 
         <label className="flex items-start gap-2 text-sm text-ink/80">
           <input

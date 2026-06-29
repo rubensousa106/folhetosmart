@@ -34,8 +34,8 @@ Recolhemos apenas os dados estritamente necessários ao funcionamento da app:
 
 **Não recolhemos diretamente**: localização GPS, contactos, fotografias,
 ficheiros nem dados financeiros. A app e o site podem ser usados sem conta —
-nesse caso não recolhemos dados de conta; no entanto, para nos financiarmos,
-mostramos publicidade que pode usar cookies e identificadores (ver secção 6).
+nesse caso não recolhemos dados de conta; no entanto, podem ser apresentados
+anúncios que utilizam cookies e identificadores (ver secção 6).
 
 ## 3. Base legal do tratamento
 
@@ -76,17 +76,16 @@ Para exercer qualquer direito também podes escrever para
 
 ## 6. Publicidade e cookies
 
-O FolhetoSmart é gratuito e financia-se através de **publicidade**. Para isso
-usamos o **Google AdSense** (no site) e o **Google AdMob** (na aplicação),
-serviços da Google LLC.
+A aplicação e o site podem apresentar publicidade fornecida por parceiros,
+nomeadamente a Google (Google AdSense e Google AdMob). Para apresentar e medir os
+anúncios, estes parceiros podem tratar determinados dados, incluindo cookies e
+identificadores de publicidade.
 
-- Estes serviços podem usar **cookies e identificadores de publicidade** para
-  apresentar anúncios e medir o seu desempenho.
-- No Espaço Económico Europeu, **só apresentamos anúncios personalizados com o
-  teu consentimento**, pedido antes de os anúncios serem carregados. Podes
-  aceitar, recusar ou escolher apenas anúncios não personalizados, e alterar a
+- No Espaço Económico Europeu, os anúncios personalizados só são apresentados com
+  o teu consentimento, solicitado antes do carregamento dos anúncios. Podes
+  aceitar, recusar ou optar apenas por anúncios não personalizados, e alterar a
   tua escolha a qualquer momento.
-- **Não partilhamos** com a Google o teu email, a tua lista de compras nem os
+- Não partilhamos com estes parceiros o teu email, a tua lista de compras nem os
   teus alertas.
 - Os utilizadores com perfil de administração não veem publicidade.
 

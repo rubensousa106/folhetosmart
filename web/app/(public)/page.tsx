@@ -12,6 +12,7 @@ import {
 import { SITE, SUPERMARKETS } from "@/lib/site";
 import { faqJsonLd } from "@/lib/seo";
 import { JsonLd } from "@/components/JsonLd";
+import { WeekHighlights } from "@/components/WeekHighlights";
 
 export const metadata: Metadata = {
   title: "Comparador de preços dos folhetos de supermercado",
@@ -34,7 +35,7 @@ const FAQ = [
   },
   {
     q: "É gratuito?",
-    a: "Sim, o FolhetoSmart é gratuito. Basta criares uma conta para acederes à comparação de preços.",
+    a: "Sim, o FolhetoSmart é 100% gratuito, sem subscrições nem custos escondidos. Basta criares uma conta gratuita para comparares os preços.",
   },
 ];
 
@@ -170,6 +171,24 @@ export default function HomePage() {
           </Link>
           .
         </p>
+      </section>
+
+      {/* Ofertas da semana (teaser real, vem do backend) */}
+      <section className="container-page py-8" aria-labelledby="ofertas">
+        <h2 id="ofertas" className="text-center text-2xl font-bold text-ink">
+          Ofertas da semana
+        </h2>
+        <p className="mx-auto mt-2 max-w-2xl text-center text-ink/70">
+          Uma amostra do que está em promoção. Cria conta para comparares todos os preços.
+        </p>
+        <div className="mt-8">
+          <WeekHighlights />
+        </div>
+        <div className="mt-6 text-center">
+          <Link href="/ofertas-da-semana/" className="font-medium text-brand hover:underline">
+            Ver mais ofertas da semana →
+          </Link>
+        </div>
       </section>
 
       {/* FAQ */}

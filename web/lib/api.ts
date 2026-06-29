@@ -202,6 +202,13 @@ export async function fetchOfferings(): Promise<FlyerOffering[]> {
   return merged.filter((o) => !isExpired(o.validade));
 }
 
+/** Amostra PÚBLICA de ofertas da semana (isco do site) — sem login. */
+export async function highlights(): Promise<FlyerOffering[]> {
+  const res = await fetch(`${SITE.apiUrl}/api/v1/products/highlights`);
+  if (!res.ok) throw new ApiError(res.status, "Ofertas indisponíveis");
+  return (await res.json()) as FlyerOffering[];
+}
+
 // --- lista de compras (sincronizada com a conta) ---------------------------
 
 export const shopping = {

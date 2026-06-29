@@ -10,6 +10,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/como-funciona",
     "/poupar-no-supermercado",
     "/calculadora-poupanca",
+    "/ofertas-da-semana",
     "/privacidade",
     "/termos",
     "/entrar",

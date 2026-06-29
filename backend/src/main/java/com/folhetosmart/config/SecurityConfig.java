@@ -14,6 +14,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 /** Segurança stateless baseada em JWT + RBAC, endurecida para produção. */
 @Configuration
@@ -36,6 +41,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 // Cabeçalhos de segurança exigidos para a Play Store (Update 5):
                 // HSTS (1 ano, inclui subdomínios), X-Content-Type-Options: nosniff,
@@ -49,6 +55,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Públicos
                         .requestMatchers("/api/v1/auth/**").permitAll()
+                        // Amostra pública (isco do site) — limitada a poucas ofertas.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/products/highlights").permitAll()
                         // Dados dos folhetos — NEGÓCIO PRIVADO: só utilizadores
                         // autenticados (a app envia sempre o JWT). Evita que
                         // concorrentes "raspem" a base de comparação.
@@ -77,6 +85,24 @@ public class SecurityConfig {
         }
 
         return http.build();
+    }
+
+    /** CORS — permite à app web (browser) chamar a API a partir do seu domínio. */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOriginPatterns(List.of(
+                "https://folhetosmart.pt",
+                "https://www.folhetosmart.pt",
+                "https://*.pages.dev",
+                "http://localhost:3000"
+        ));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 
     @Bean

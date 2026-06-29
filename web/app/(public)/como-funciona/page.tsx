@@ -49,6 +49,10 @@ export default function ComoFuncionaPage() {
         preparado — rápido, organizado e sempre com o preço mais baixo em destaque.
       </p>
 
+      <p className="mt-6 inline-flex items-center gap-2 rounded-full bg-savings-bg px-4 py-2 text-sm font-medium text-brand-dark">
+        <Sparkles className="h-4 w-4" /> 100% gratuito, para sempre — sem subscrições nem custos escondidos.
+      </p>
+
       <ol className="mt-10 space-y-6">
         {SECTIONS.map((s, i) => (
           <li key={s.title} className="flex gap-4 rounded-2xl border border-outline/60 bg-white p-6">

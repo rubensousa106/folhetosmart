@@ -1,6 +1,6 @@
 # Termos de Utilização — FolhetoSmart
 
-**Versão 1.0 · Última atualização: 10 de junho de 2026**
+**Versão 1.1 · Última atualização: 29 de junho de 2026**
 **URL pública: https://folhetosmart.pt/termos**
 
 Ao criar conta ou utilizar a aplicação FolhetoSmart aceitas estes Termos de
@@ -11,9 +11,9 @@ Utilização. Lê-os com atenção.
 O FolhetoSmart é uma aplicação gratuita que agrega e compara os preços
 publicados nos folhetos semanais de supermercados portugueses (Lidl,
 Continente, Pingo Doce, Intermarché e Aldi), permite criar listas de compras
-otimizadas por supermercado e enviar alertas de preço. O serviço é prestado
-"tal como está", podendo ser alterado, suspenso ou descontinuado a qualquer
-momento.
+otimizadas por supermercado e enviar alertas de preço. O serviço é gratuito e
+poderá apresentar publicidade (ver secção 6). É prestado "tal como está", podendo
+ser alterado, suspenso ou descontinuado a qualquer momento.
 
 ## 2. Condições de uso
 
@@ -59,7 +59,16 @@ qualquer momento na app (Definições → "Eliminar conta e dados"), o que
 elimina de forma irreversível todos os teus dados, nos termos da Política
 de Privacidade (https://folhetosmart.pt/privacidade).
 
-## 6. Lei aplicável e foro competente
+## 6. Publicidade
+
+O serviço pode apresentar publicidade, incluindo anúncios fornecidos por
+parceiros como a Google (Google AdSense e Google AdMob). Para apresentar e medir
+os anúncios, esses parceiros podem utilizar cookies e identificadores, nos termos
+descritos na Política de Privacidade (https://folhetosmart.pt/privacidade). No
+Espaço Económico Europeu, a apresentação de anúncios personalizados depende do
+teu consentimento, que podes gerir a qualquer momento.
+
+## 7. Lei aplicável e foro competente
 
 Estes termos regem-se pela **lei portuguesa**. Para a resolução de qualquer
 litígio emergente destes termos são competentes os **tribunais

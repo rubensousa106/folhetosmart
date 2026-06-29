@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -137,6 +138,41 @@ public class ProductController {
             }
         }
         return ResponseEntity.ok(offerings);
+    }
+
+    /**
+     * GET /api/v1/products/highlights — amostra PÚBLICA (até 8) de ofertas da
+     * semana, para o "isco" do site (visitantes sem sessão). Limitada e variada
+     * de propósito — NÃO é a base completa (essa é privada/autenticada).
+     */
+    @GetMapping("/highlights")
+    public List<FlyerOfferingDto> highlights() {
+        List<FlyerOfferingDto> offerings = new ArrayList<>();
+        for (LatestProducts lp : latestProductsRepository.findAll()) {
+            String key = lp.getSupermarket();
+            if (key == null || key.startsWith("__feed_url__")) {
+                continue;
+            }
+            try {
+                JsonNode root = objectMapper.readTree(lp.getPayload());
+                String supermercado = root.path("supermercado").asText(key);
+                String validade = parseValidade(lp.getSourceFlyer());
+                for (JsonNode item : root.path("produtos")) {
+                    String produto = item.path("produto").asText(null);
+                    double preco = item.path("preco").asDouble(0);
+                    if (produto == null || produto.isBlank() || preco <= 0) {
+                        continue;
+                    }
+                    String canonico = item.path("canonico").asText(null);
+                    String nome = (canonico != null && !canonico.isBlank()) ? canonico : produto;
+                    offerings.add(new FlyerOfferingDto(nome, preco, supermercado, validade, produto));
+                }
+            } catch (Exception ignored) {
+                // payload inválido não trava os outros
+            }
+        }
+        Collections.shuffle(offerings);
+        return offerings.stream().limit(8).toList();
     }
 
     /**
