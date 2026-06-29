@@ -14,7 +14,7 @@ const SECTIONS = [
   {
     icon: RefreshCw,
     title: "Recolhemos os folhetos por ti",
-    text: "Todas as quintas-feiras, quando os supermercados publicam os folhetos da semana, recolhemos e organizamos os preços do Lidl, Continente, Pingo Doce, Intermarché e Aldi.",
+    text: "Assim que cada supermercado lança o seu folheto da semana (cada um no seu dia), recolhemos e organizamos os preços do Lidl, Continente, Pingo Doce, Intermarché e Aldi.",
   },
   {
     icon: Sparkles,

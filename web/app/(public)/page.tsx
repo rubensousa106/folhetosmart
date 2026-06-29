@@ -27,7 +27,7 @@ const FAQ = [
   },
   {
     q: "Quando saem os folhetos novos?",
-    a: "Os supermercados publicam os folhetos à quinta-feira. O FolhetoSmart recolhe e organiza os preços automaticamente para essa semana.",
+    a: "Cada supermercado lança o seu folheto no seu próprio dia da semana. O FolhetoSmart recolhe e organiza os preços automaticamente assim que cada folheto é publicado.",
   },
   {
     q: "A lista de compras fica sincronizada com a app?",

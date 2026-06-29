@@ -2,13 +2,13 @@
 
 # Política de Privacidade — FolhetoSmart
 
-**Versão 1.1 · Última atualização: 29 de junho de 2026**
+**Versão 1.2 · Última atualização: 29 de junho de 2026**
 **URL pública: https://folhetosmart.pt/privacidade**
 
-A tua privacidade é importante para nós. Esta política explica, de forma
+A sua privacidade é importante para nós. Esta política explica, de forma
 clara, que dados o FolhetoSmart recolhe, porquê, durante quanto tempo os
-guarda e que direitos tens sobre eles, em conformidade com o Regulamento
-Geral sobre a Proteção de Dados (Regulamento (UE) 2016/679, "RGPD").
+guarda e que direitos lhe assistem sobre eles, em conformidade com o
+Regulamento Geral sobre a Proteção de Dados (Regulamento (UE) 2016/679, "RGPD").
 
 ## 1. Responsável pelo tratamento
 
@@ -26,52 +26,51 @@ Recolhemos apenas os dados estritamente necessários ao funcionamento da app:
 
 | Dado | Quando é recolhido | Finalidade |
 |---|---|---|
-| Email e palavra-passe (cifrada) | Ao criares conta | Autenticação e acesso aos teus alertas em vários dispositivos |
-| Distrito e cidade | Se os indicares no onboarding | Mostrar preços regionais do Aldi; nunca usamos GPS |
-| Lista de compras e alertas de preço | Quando os crias | Funcionalidade principal: otimizar a lista e avisar-te de promoções |
-| Token de notificações (FCM) | Se ativares notificações | Entrega de alertas de preço no teu dispositivo |
-| Registos de consentimento (data, versão dos termos, hash do IP) | Ao aceitares os termos | Prova de consentimento exigida por lei (Art. 7.º RGPD) |
+| Email e palavra-passe (cifrada) | Ao criar conta | Autenticação e acesso aos seus alertas em vários dispositivos |
+| Distrito e cidade | Se os indicar no registo | Mostrar preços regionais do Aldi; nunca usamos GPS |
+| Lista de compras e alertas de preço | Quando os cria | Funcionalidade principal: otimizar a lista e avisar de promoções |
+| Token de notificações (FCM) | Se ativar as notificações | Entrega de alertas de preço no seu dispositivo |
+| Registos de consentimento (data, versão dos termos, hash do IP) | Ao aceitar os termos | Prova de consentimento exigida por lei (Art. 7.º RGPD) |
 
 **Não recolhemos diretamente**: localização GPS, contactos, fotografias,
-ficheiros nem dados financeiros. A app e o site podem ser usados sem conta —
-nesse caso não recolhemos dados de conta; no entanto, podem ser apresentados
+ficheiros nem dados financeiros. A app e o site podem ser utilizados sem conta
+— nesse caso não recolhemos dados de conta; no entanto, podem ser apresentados
 anúncios que utilizam cookies e identificadores (ver secção 6).
 
 ## 3. Base legal do tratamento
 
-Tratamos os teus dados com base no **consentimento explícito** que dás ao
+Tratamos os seus dados com base no **consentimento explícito** prestado ao
 criar conta e aceitar esta política (Art. 6.º(1)(a) RGPD). As notificações
-têm consentimento separado e opcional. Podes retirar qualquer consentimento
-a qualquer momento (ver secção 5), sem afetar a licitude do tratamento
-anterior.
+têm consentimento separado e opcional. Pode retirar qualquer consentimento a
+qualquer momento (ver secção 5), sem afetar a licitude do tratamento anterior.
 
 ## 4. Período de retenção
 
 - **Dados de conta (email, alertas, lista)**: guardados enquanto a conta
-  existir. Ao eliminares a conta, são removidos de imediato e de forma
+  existir. Ao eliminar a conta, são removidos de imediato e de forma
   irreversível.
 - **Registos de consentimento e auditoria**: guardados até 3 anos após a
   eliminação da conta, de forma anonimizada (sem ligação à conta eliminada),
   apenas para cumprimento de obrigações legais de prova.
-- **Preços e folhetos**: são dados públicos dos supermercados, não são dados
-  pessoais e não te dizem respeito.
+- **Preços e folhetos**: são dados públicos dos supermercados e não
+  constituem dados pessoais.
 
-## 5. Os teus direitos
+## 5. Os seus direitos
 
-Ao abrigo dos Art. 15.º a 21.º do RGPD, tens direito a:
+Ao abrigo dos Art. 15.º a 21.º do RGPD, tem direito a:
 
 - **Acesso e portabilidade** — na app: Definições → "Exportar os meus dados"
-  (recebes um ficheiro JSON com tudo o que guardamos sobre ti);
-- **Retificação** — podes corrigir o teu email contactando-nos;
+  (recebe um ficheiro JSON com tudo o que guardamos a seu respeito);
+- **Retificação** — pode corrigir o seu email contactando-nos;
 - **Eliminação ("direito ao esquecimento")** — na app: Definições →
   "Eliminar conta e dados". A eliminação é imediata, total e irreversível;
-- **Oposição e retirada de consentimento** — desativa as notificações nas
-  definições do sistema ou elimina a conta;
-- **Reclamação** — tens o direito de apresentar reclamação à autoridade de
+- **Oposição e retirada de consentimento** — pode desativar as notificações
+  nas definições do sistema ou eliminar a conta;
+- **Reclamação** — tem o direito de apresentar reclamação à autoridade de
   controlo portuguesa: CNPD — Comissão Nacional de Proteção de Dados
   (www.cnpd.pt).
 
-Para exercer qualquer direito também podes escrever para
+Para exercer qualquer direito pode também escrever para
 **privacidade@folhetosmart.pt** — respondemos no prazo máximo de 30 dias.
 
 ## 6. Publicidade e cookies
@@ -82,14 +81,14 @@ anúncios, estes parceiros podem tratar determinados dados, incluindo cookies e
 identificadores de publicidade.
 
 - No Espaço Económico Europeu, os anúncios personalizados só são apresentados com
-  o teu consentimento, solicitado antes do carregamento dos anúncios. Podes
+  o seu consentimento, solicitado antes do carregamento dos anúncios. Pode
   aceitar, recusar ou optar apenas por anúncios não personalizados, e alterar a
-  tua escolha a qualquer momento.
-- Não partilhamos com estes parceiros o teu email, a tua lista de compras nem os
-  teus alertas.
+  sua escolha a qualquer momento.
+- Não partilhamos com estes parceiros o seu email, a sua lista de compras nem os
+  seus alertas.
 - Os utilizadores com perfil de administração não veem publicidade.
 
-Podes gerir as preferências de anúncios da Google em
+Pode gerir as preferências de anúncios da Google em
 **https://adssettings.google.com** e saber mais em
 **https://policies.google.com/technologies/ads**.
 
@@ -105,13 +104,14 @@ sai do Espaço Económico Europeu.
 
 ## 8. Contacto para questões de privacidade
 
-Para qualquer questão sobre esta política ou sobre os teus dados:
+Para qualquer questão sobre esta política ou sobre os seus dados:
 
 > **privacidade@folhetosmart.pt**
 
 ## 9. Alterações a esta política
 
-Quando alterarmos esta política, atualizamos a versão e a data no topo deste
-documento e notificamos-te na app antes de a alteração produzir efeitos.
-Alterações que ampliem o tratamento de dados exigem novo consentimento
-explícito. As versões anteriores ficam disponíveis mediante pedido.
+Sempre que alterarmos esta política, atualizamos a versão e a data no topo
+deste documento e informamos os utilizadores na app antes de a alteração
+produzir efeitos. Alterações que ampliem o tratamento de dados exigem novo
+consentimento explícito. As versões anteriores ficam disponíveis mediante
+pedido.

@@ -42,21 +42,21 @@ export const SUPERMARKETS: Supermarket[] = [
   {
     slug: "lidl",
     name: "Lidl",
-    flyerDay: "quinta-feira",
+    flyerDay: "segunda-feira",
     blurb:
       "Vê o folheto Lidl da semana e compara os preços com os outros supermercados antes de ires às compras.",
   },
   {
     slug: "continente",
     name: "Continente",
-    flyerDay: "quinta-feira",
+    flyerDay: "terça-feira",
     blurb:
       "Promoções e folheto Continente comparados com Lidl, Pingo Doce, Intermarché e Aldi, produto a produto.",
   },
   {
     slug: "pingo-doce",
     name: "Pingo Doce",
-    flyerDay: "quinta-feira",
+    flyerDay: "terça-feira",
     blurb:
       "Folheto Pingo Doce da semana com o preço mais baixo em destaque face às outras cadeias.",
   },
@@ -70,7 +70,7 @@ export const SUPERMARKETS: Supermarket[] = [
   {
     slug: "aldi",
     name: "Aldi",
-    flyerDay: "quinta-feira",
+    flyerDay: "segunda-feira",
     blurb:
       "Folheto Aldi (com versões regionais) lado a lado com Lidl, Continente, Pingo Doce e Intermarché.",
   },
