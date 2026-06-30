@@ -144,6 +144,7 @@ data class PromotionDto(
 data class RegisterRequest(val email: String, val password: String)
 data class LoginRequest(val email: String, val password: String)
 data class ForgotPasswordRequest(val email: String)
+data class RefreshRequest(val refreshToken: String)
 data class AuthResponse(
     val token: String,
     val refreshToken: String? = null,

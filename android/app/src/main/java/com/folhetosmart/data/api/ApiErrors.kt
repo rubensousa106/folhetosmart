@@ -26,3 +26,24 @@ fun HttpException.serverMessage(): String? = try {
 } catch (e: Exception) {
     null
 }
+
+/**
+ * Mensagem PT-PT para o utilizador a partir do código de estado HTTP — nunca um
+ * número. Espelha `friendlyStatus()` da web (web/lib/api.ts), para a mesma
+ * lógica não ficar repetida em cada ecrã da app.
+ *
+ * Ordem: [overrides] (mensagens específicas deste ecrã para códigos que aqui
+ * significam outra coisa, ex.: 400 = "PDF inválido" no Admin) > [serverMessage]
+ * (mensagem que o backend já devolveu) > mensagem genérica por código.
+ */
+fun HttpException.friendlyMessage(overrides: Map<Int, String> = emptyMap()): String {
+    overrides[code()]?.let { return it }
+    serverMessage()?.let { return it }
+    return when (code()) {
+        401 -> "Email ou palavra-passe incorretos."
+        403 -> "Sem permissão para fazer isto."
+        409 -> "Já existe uma conta com este email."
+        429 -> "Demasiadas tentativas. Tenta novamente daqui a 15 minutos."
+        else -> "Não foi possível completar o pedido. Tenta novamente."
+    }
+}

@@ -105,6 +105,10 @@ interface ApiService {
     @POST("api/v1/auth/forgot-password")
     suspend fun forgotPassword(@Body request: ForgotPasswordRequest)
 
+    // Renovação de sessão (usado pelo Authenticator em ApiClient.kt).
+    @POST("api/v1/auth/refresh")
+    suspend fun refresh(@Body request: RefreshRequest): AuthResponse
+
     // --- Privacidade RGPD (requerem JWT) ---
     @GET("api/v1/privacy/my-data")
     suspend fun exportMyData(@Header("Authorization") bearer: String): okhttp3.ResponseBody

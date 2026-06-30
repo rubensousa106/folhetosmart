@@ -7,7 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
-import com.folhetosmart.data.api.serverMessage
+import com.folhetosmart.data.api.friendlyMessage
 import com.folhetosmart.data.repository.AlertsRepository
 import com.folhetosmart.data.repository.PrivacyRepository
 import com.folhetosmart.data.repository.UserRepository
@@ -25,7 +25,7 @@ data class OnboardingUiState(
     val emailError: String? = null,
     /** Passo 1 concluído — a UI avança para a localização. */
     val accountCreated: Boolean = false,
-    /** Passo 2 concluído (guardado ou saltado) — a UI termina o registo. */
+    /** Passo 2 concluído (zona guardada) — a UI termina o registo. */
     val locationDone: Boolean = false,
     val notificationsAccepted: Boolean = false,
     /** Nome dado no passo 1 (guardado já aí; reenviado no passo 2 p/ não ser apagado). */
@@ -75,12 +75,11 @@ class OnboardingViewModel(
                     name = cleanName
                 )
             } catch (e: HttpException) {
-                _uiState.value = when (e.code()) {
-                    409 -> OnboardingUiState(emailError = "Já existe uma conta com este email.")
-                    429 -> OnboardingUiState(error = "Demasiadas tentativas. Tenta novamente daqui a 15 minutos.")
-                    else -> OnboardingUiState(
-                        error = e.serverMessage() ?: "Não foi possível criar a conta (${e.code()})."
-                    )
+                // O 409 (email já existe) mostra-se junto ao campo, não como erro geral.
+                _uiState.value = if (e.code() == 409) {
+                    OnboardingUiState(emailError = e.friendlyMessage())
+                } else {
+                    OnboardingUiState(error = e.friendlyMessage())
                 }
             } catch (e: Exception) {
                 _uiState.value = OnboardingUiState(
@@ -103,15 +102,10 @@ class OnboardingViewModel(
             } catch (e: Exception) {
                 _uiState.value = current.copy(
                     submitting = false,
-                    error = "Não foi possível guardar a localização. Podes definir mais tarde."
+                    error = "Não foi possível guardar a localização. Verifica a ligação e tenta novamente."
                 )
             }
         }
-    }
-
-    /** Passo 2 — saltar (a localização é opcional; só afeta o folheto Aldi). */
-    fun skipLocation() {
-        _uiState.value = _uiState.value.copy(locationDone = true, error = null)
     }
 
     companion object {

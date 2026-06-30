@@ -19,7 +19,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,7 +44,7 @@ import com.folhetosmart.ui.components.ValidatedTextField
 /**
  * Registo em 2 passos (Fix 1):
  *  Passo 1 — conta + consentimentos RGPD;
- *  Passo 2 — localização para o folheto Aldi (opcional).
+ *  Passo 2 — localização para o folheto Aldi (obrigatória).
  */
 @Composable
 fun OnboardingScreen(
@@ -90,8 +89,7 @@ fun OnboardingScreen(
             LocationStep(
                 submitting = state.submitting,
                 error = state.error,
-                onSave = viewModel::saveLocation,
-                onSkip = viewModel::skipLocation
+                onSave = viewModel::saveLocation
             )
         }
 
@@ -262,13 +260,12 @@ private fun AccountStep(
     }
 }
 
-/** Passo 2 — localização para o folheto regional do Aldi (opcional). */
+/** Passo 2 — localização para o folheto regional do Aldi (obrigatória). */
 @Composable
 private fun LocationStep(
     submitting: Boolean,
     error: String?,
-    onSave: (String?, String?) -> Unit,
-    onSkip: () -> Unit
+    onSave: (String?, String?) -> Unit
 ) {
     var district by remember { mutableStateOf<String?>(null) }
     var city by remember { mutableStateOf("") }
@@ -287,7 +284,7 @@ private fun LocationStep(
         )
         Text(
             "Passo 2 de 2 — o folheto do Aldi varia por região. Escolhe o teu " +
-                "distrito e cidade (sem GPS — podes alterar ou saltar).",
+                "distrito e cidade (sem GPS — podes alterar mais tarde em Definições).",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
@@ -312,18 +309,11 @@ private fun LocationStep(
         Spacer(Modifier.height(16.dp))
 
         Button(
-            onClick = { onSave(district, city.ifBlank { null }) },
-            enabled = !submitting && (district != null || city.isNotBlank()),
+            onClick = { onSave(district, city) },
+            enabled = !submitting && district != null && city.isNotBlank(),
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(if (submitting) "A guardar…" else "Guardar e continuar")
-        }
-        OutlinedButton(
-            onClick = onSkip,
-            enabled = !submitting,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Saltar por agora")
         }
     }
 }

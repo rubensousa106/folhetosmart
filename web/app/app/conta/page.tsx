@@ -17,6 +17,7 @@ import {
 import { users, privacy, ApiError, type UserMe } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { UserAvatar } from "@/components/UserAvatar";
+import { DistritoCidadeFields } from "@/components/DistritoCidadeFields";
 
 type Msg = { kind: "ok" | "err"; text: string } | null;
 type Section = "nome" | "zona" | "email" | "password" | null;
@@ -93,8 +94,14 @@ export default function ContaPage() {
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
-    setSavingProfile(true);
     setProfileMsg(null);
+    // A zona é obrigatória — só se aplica quando é essa a secção a gravar (não
+    // bloqueia gravar o nome só porque uma conta antiga ainda não tem zona).
+    if (section === "zona" && (!district || !city)) {
+      setProfileMsg({ kind: "err", text: "O distrito e a cidade são obrigatórios." });
+      return;
+    }
+    setSavingProfile(true);
     try {
       // Reenvia os 3 campos: o PUT /me substitui-os todos (não apagar a zona).
       const u = await users.updateProfile(
@@ -267,16 +274,13 @@ export default function ContaPage() {
 
         {section === "zona" && (
           <form onSubmit={saveProfile} className="mt-4 space-y-3">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="district" className="mb-1 block text-sm font-medium text-ink">Distrito</label>
-                <input id="district" className="input" value={district} onChange={(e) => setDistrict(e.target.value)} />
-              </div>
-              <div>
-                <label htmlFor="city" className="mb-1 block text-sm font-medium text-ink">Cidade</label>
-                <input id="city" className="input" value={city} onChange={(e) => setCity(e.target.value)} />
-              </div>
-            </div>
+            <DistritoCidadeFields
+              distrito={district}
+              cidade={city}
+              onDistritoChange={(v) => { setDistrict(v); setCity(""); }}
+              onCidadeChange={setCity}
+              required
+            />
             <p className="text-xs text-ink/50">A zona define o folheto regional do Aldi.</p>
             <button type="submit" className="btn-primary" disabled={savingProfile}>
               {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

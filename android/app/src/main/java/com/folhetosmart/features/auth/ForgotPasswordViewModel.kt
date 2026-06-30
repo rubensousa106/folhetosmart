@@ -7,7 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
-import com.folhetosmart.data.api.serverMessage
+import com.folhetosmart.data.api.friendlyMessage
 import com.folhetosmart.data.repository.AlertsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,13 +35,7 @@ class ForgotPasswordViewModel(private val repository: AlertsRepository) : ViewMo
                 repository.forgotPassword(email.trim())
                 _uiState.value = ForgotPasswordUiState(done = true)
             } catch (e: HttpException) {
-                _uiState.value = ForgotPasswordUiState(
-                    error = if (e.code() == 429) {
-                        "Demasiadas tentativas. Tenta novamente daqui a 15 minutos."
-                    } else {
-                        e.serverMessage() ?: "Não foi possível processar o pedido (${e.code()})."
-                    }
-                )
+                _uiState.value = ForgotPasswordUiState(error = e.friendlyMessage())
             } catch (e: Exception) {
                 _uiState.value = ForgotPasswordUiState(
                     error = "Sem ligação ao servidor. Tenta novamente."

@@ -19,8 +19,9 @@ class AppContainer(context: Context) {
 
     val tokenStore = TokenStore(context.applicationContext)
 
-    // O JWT da sessão é injetado em todos os pedidos.
-    private val api = ApiClient.create { tokenStore.bearer }
+    // O JWT da sessão é injetado em todos os pedidos; o ApiClient também usa o
+    // tokenStore para renovar a sessão sozinha quando o token de acesso expira.
+    private val api = ApiClient.create(tokenStore)
 
     private val database = Room.databaseBuilder(
         context.applicationContext,

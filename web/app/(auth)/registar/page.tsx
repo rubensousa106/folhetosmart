@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { UserPlus, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { ApiError, users } from "@/lib/api";
+import { DistritoCidadeFields } from "@/components/DistritoCidadeFields";
 
 export default function RegistarPage() {
   const { register } = useAuth();
@@ -30,6 +31,14 @@ export default function RegistarPage() {
       setError("A palavra-passe tem de ter pelo menos 8 caracteres.");
       return;
     }
+    if (!district) {
+      setError("O distrito é obrigatório.");
+      return;
+    }
+    if (!city) {
+      setError("A cidade é obrigatória.");
+      return;
+    }
     if (!accepted) {
       setError("Tens de aceitar os Termos e a Política de Privacidade.");
       return;
@@ -39,11 +48,7 @@ export default function RegistarPage() {
       await register(email, password);
       // Guarda o nome logo a seguir (a conta já tem sessão) — como na app.
       try {
-        await users.updateProfile(
-          name.trim(),
-          district.trim() || null,
-          city.trim() || null,
-        );
+        await users.updateProfile(name.trim(), district, city);
       } catch {
         /* não bloqueia o registo; o nome pode ser definido na conta */
       }
@@ -93,26 +98,13 @@ export default function RegistarPage() {
           <p className="mt-1 text-xs text-ink/60">Pelo menos 8 caracteres.</p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="district" className="mb-1 block text-sm font-medium text-ink">
-              Distrito <span className="font-normal text-ink/50">(opcional)</span>
-            </label>
-            <input
-              id="district" type="text" className="input" value={district}
-              onChange={(e) => setDistrict(e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="city" className="mb-1 block text-sm font-medium text-ink">
-              Cidade <span className="font-normal text-ink/50">(opcional)</span>
-            </label>
-            <input
-              id="city" type="text" className="input" value={city}
-              onChange={(e) => setCity(e.target.value)}
-            />
-          </div>
-        </div>
+        <DistritoCidadeFields
+          distrito={district}
+          cidade={city}
+          onDistritoChange={(v) => { setDistrict(v); setCity(""); }}
+          onCidadeChange={setCity}
+          required
+        />
         <p className="-mt-2 text-xs text-ink/50">A zona define o folheto regional do Aldi.</p>
 
         <label className="flex items-start gap-2 text-sm text-ink/80">

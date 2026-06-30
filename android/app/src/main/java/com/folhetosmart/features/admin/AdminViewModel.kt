@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
 import com.folhetosmart.data.api.SupermarketStatusDto
+import com.folhetosmart.data.api.friendlyMessage
 import com.folhetosmart.data.api.SyncStatusDto
 import com.folhetosmart.data.repository.AdminRepository
 import com.folhetosmart.data.repository.CompareRepository
@@ -281,13 +282,14 @@ class AdminViewModel(
         _uiState.value.supermarkets.firstOrNull { it.slug == slug }?.name ?: "este supermercado"
 
     private fun humanize(e: Exception): String = when (e) {
-        is HttpException -> when (e.code()) {
-            403 -> "Sem permissão — apenas administradores podem carregar folhetos."
-            400 -> "PDF inválido ou datas incorretas."
-            413 -> "O ficheiro é demasiado grande."
-            429 -> "Demasiados pedidos. Aguarda um momento."
-            else -> "Falha no envio (erro ${e.code()})."
-        }
+        is HttpException -> e.friendlyMessage(
+            mapOf(
+                400 to "PDF inválido ou datas incorretas.",
+                403 to "Sem permissão — apenas administradores podem carregar folhetos.",
+                413 to "O ficheiro é demasiado grande.",
+                429 to "Demasiados pedidos. Aguarda um momento.",
+            )
+        )
         else -> "Não foi possível enviar o folheto. Verifica a ligação."
     }
 

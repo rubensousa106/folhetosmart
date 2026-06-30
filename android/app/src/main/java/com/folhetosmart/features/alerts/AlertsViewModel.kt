@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
 import com.folhetosmart.data.api.AlertDto
+import com.folhetosmart.data.api.friendlyMessage
 import com.folhetosmart.data.repository.AlertsRepository
 import com.folhetosmart.data.repository.CompareRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,12 +72,7 @@ class AlertsViewModel(
                 else repository.login(email, password)
                 loadAlerts()
             } catch (e: HttpException) {
-                val message = when (e.code()) {
-                    401 -> "Email ou palavra-passe incorretos."
-                    409 -> "Já existe uma conta com este email."
-                    else -> "Não foi possível iniciar sessão (${e.code()})."
-                }
-                _uiState.value = AlertsUiState.NeedsLogin(error = message)
+                _uiState.value = AlertsUiState.NeedsLogin(error = e.friendlyMessage())
             } catch (e: Exception) {
                 _uiState.value = AlertsUiState.NeedsLogin(
                     error = "Sem ligação ao servidor. Tenta novamente."

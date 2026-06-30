@@ -7,7 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
-import com.folhetosmart.data.api.serverMessage
+import com.folhetosmart.data.api.friendlyMessage
 import com.folhetosmart.data.repository.PrivacyRepository
 import com.folhetosmart.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -163,11 +163,9 @@ class SettingsViewModel(
     fun consumeMessage() = _uiState.update { it.copy(message = null) }
 
     private fun humanize(e: Exception): String = when (e) {
-        is HttpException -> e.serverMessage() ?: when (e.code()) {
-            400 -> "A palavra-passe atual está incorreta (ou os dados são inválidos)."
-            409 -> "Já existe uma conta com este email."
-            else -> "Não foi possível guardar (erro ${e.code()})."
-        }
+        is HttpException -> e.friendlyMessage(
+            mapOf(400 to "A palavra-passe atual está incorreta (ou os dados são inválidos).")
+        )
         else -> "Sem ligação ao servidor. Tenta novamente."
     }
 

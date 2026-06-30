@@ -7,7 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.folhetosmart.FolhetoSmartApp
-import com.folhetosmart.data.api.serverMessage
+import com.folhetosmart.data.api.friendlyMessage
 import com.folhetosmart.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,10 +36,9 @@ class SetNewPasswordViewModel(private val users: UserRepository) : ViewModel() {
                 _uiState.value = SetNewPasswordUiState(done = true)
             } catch (e: HttpException) {
                 _uiState.value = SetNewPasswordUiState(
-                    error = e.serverMessage() ?: when (e.code()) {
-                        400 -> "A palavra-passe temporária já não é válida. Pede uma nova."
-                        else -> "Não foi possível guardar (erro ${e.code()})."
-                    }
+                    error = e.friendlyMessage(
+                        mapOf(400 to "A palavra-passe temporária já não é válida. Pede uma nova.")
+                    )
                 )
             } catch (e: Exception) {
                 _uiState.value = SetNewPasswordUiState(
