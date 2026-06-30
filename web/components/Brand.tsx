@@ -2,11 +2,12 @@ import { ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { SITE } from "@/lib/site";
 
-/** Logótipo + nome da marca, ligado à homepage. */
-export function Brand({ className = "" }: { className?: string }) {
+/** Logótipo + nome da marca. Liga à homepage por omissão; dentro da app, passa-se
+ *  href="/app/comparar/" para o logo NÃO sair da área autenticada. */
+export function Brand({ className = "", href = "/" }: { className?: string; href?: string }) {
   return (
     <Link
-      href="/"
+      href={href}
       className={`inline-flex items-center gap-2 font-bold text-brand ${className}`}
       aria-label={`${SITE.name} — ${SITE.tagline}`}
     >

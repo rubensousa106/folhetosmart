@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, ListChecks, User, LogOut, Loader2 } from "lucide-react";
+import { Search, ListChecks, User, LogOut, Loader2, Shield } from "lucide-react";
 import { Brand } from "./Brand";
 import { useAuth, useRequireAuth } from "@/lib/auth";
 import { AdUnit } from "./AdSense";
@@ -13,6 +13,9 @@ const NAV = [
   { href: "/app/lista/", label: "Lista", icon: ListChecks },
   { href: "/app/conta/", label: "Conta", icon: User },
 ];
+
+/** Separador extra, visível só para a conta de administração (role ADMIN). */
+const ADMIN_ITEM = { href: "/app/admin/", label: "Admin", icon: Shield };
 
 /** Casca da área autenticada: guarda de rota + navegação + sessão. */
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -28,13 +31,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // O separador Admin só aparece para a conta de administração.
+  const nav = session.role === "ADMIN" ? [...NAV, ADMIN_ITEM] : NAV;
+
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <header className="sticky top-0 z-30 border-b border-outline/60 bg-surface/90 backdrop-blur">
         <div className="container-page flex h-16 items-center justify-between">
-          <Brand />
+          {/* O logo fica DENTRO da app (não volta ao site público, que parecia "pedir login"). */}
+          <Brand href="/app/comparar/" />
           <nav className="hidden items-center gap-1 sm:flex">
-            {NAV.map((n) => {
+            {nav.map((n) => {
               const active = pathname.startsWith(n.href);
               return (
                 <Link
@@ -70,7 +77,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Navegação inferior (mobile) */}
-      <nav className="sticky bottom-0 z-30 grid grid-cols-3 border-t border-outline/60 bg-white sm:hidden">
+      <nav
+        className="sticky bottom-0 z-30 grid border-t border-outline/60 bg-white sm:hidden"
+        style={{ gridTemplateColumns: `repeat(${nav.length}, minmax(0, 1fr))` }}
+      >
         {NAV.map((n) => {
           const active = pathname.startsWith(n.href);
           return (

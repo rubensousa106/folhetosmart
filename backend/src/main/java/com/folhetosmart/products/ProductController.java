@@ -156,7 +156,7 @@ public class ProductController {
             }
             try {
                 JsonNode root = objectMapper.readTree(lp.getPayload());
-                String supermercado = root.path("supermercado").asText(key);
+                String supermercado = displaySupermarket(root.path("supermercado").asText(key));
                 String validade = parseValidade(lp.getSourceFlyer());
                 for (JsonNode item : root.path("produtos")) {
                     String produto = item.path("produto").asText(null);
@@ -246,6 +246,22 @@ public class ProductController {
         } catch (Exception ignored) {
             return false;
         }
+    }
+
+    /**
+     * Nome a mostrar ao público: junta as variantes regionais do Aldi ("Aldi
+     * Açores", "Aldi Madeira", "Aldi Continente"…) num único "Aldi" — esses nomes
+     * só existem no JSON do produtor; para o utilizador da web é tudo "Aldi".
+     */
+    private static String displaySupermarket(String supermercado) {
+        if (supermercado == null) {
+            return null;
+        }
+        String s = supermercado.trim();
+        if (s.toLowerCase().startsWith("aldi")) {
+            return "Aldi";
+        }
+        return s;
     }
 
     private static String parseValidade(String sourceFlyer) {

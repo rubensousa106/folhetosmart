@@ -22,7 +22,14 @@ function groupOfferings(offerings: FlyerOffering[]): Group[] {
   const groups: Group[] = [];
   for (const [produto, offers] of map) {
     offers.sort((a, b) => a.preco - b.preco);
-    groups.push({ produto, offers, best: offers[0]?.preco ?? 0 });
+    // Um preço por supermercado (o mais barato) — junta variantes (ex.: Aldi regional).
+    const seen = new Set<string>();
+    const unique = offers.filter((o) => {
+      if (seen.has(o.supermercado)) return false;
+      seen.add(o.supermercado);
+      return true;
+    });
+    groups.push({ produto, offers: unique, best: unique[0]?.preco ?? 0 });
   }
   // Mais relevantes primeiro: os que têm mais lojas a comparar.
   groups.sort((a, b) => b.offers.length - a.offers.length);

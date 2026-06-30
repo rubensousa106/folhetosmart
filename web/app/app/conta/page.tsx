@@ -12,11 +12,14 @@ import {
   LogOut,
   AlertCircle,
   CheckCircle2,
+  Pencil,
 } from "lucide-react";
 import { users, privacy, ApiError, type UserMe } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { UserAvatar } from "@/components/UserAvatar";
 
 type Msg = { kind: "ok" | "err"; text: string } | null;
+type Section = "nome" | "zona" | "email" | "password" | null;
 
 function Feedback({ msg }: { msg: Msg }) {
   if (!msg) return null;
@@ -44,6 +47,10 @@ export default function ContaPage() {
 
   const [me, setMe] = useState<UserMe | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Edição "escondida" como na app: escolhe-se a secção a partir do avatar.
+  const [section, setSection] = useState<Section>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Perfil
   const [name, setName] = useState("");
@@ -182,76 +189,138 @@ export default function ContaPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink">A minha conta</h1>
-        {me && <p className="mt-1 text-sm text-ink/70">{me.email}</p>}
-      </div>
+      <h1 className="text-2xl font-bold text-ink">A minha conta</h1>
 
-      {/* Perfil */}
+      {/* Perfil — avatar + escolher o que editar (campos escondidos, igual à app) */}
       <section className="rounded-2xl border border-outline/60 bg-white p-6">
-        <h2 className="font-semibold text-ink">Perfil</h2>
-        <form onSubmit={saveProfile} className="mt-4 space-y-4">
-          <div>
-            <label htmlFor="name" className="mb-1 block text-sm font-medium text-ink">Nome</label>
-            <input id="name" className="input" value={name} onChange={(e) => setName(e.target.value)} />
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label="Editar conta"
+            className="shrink-0 rounded-full transition hover:opacity-90"
+          >
+            <UserAvatar seed={me?.email ?? ""} size={56} />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold text-ink">{name || "A minha conta"}</p>
+            {me && <p className="truncate text-sm text-ink/60">{me.email}</p>}
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label="Editar conta"
+            className="rounded-lg p-2 text-ink/60 transition hover:bg-brand/10 hover:text-brand"
+          >
+            <Pencil className="h-5 w-5" />
+          </button>
+        </div>
+
+        {menuOpen && (
+          <div className="mt-3 grid gap-1 rounded-xl border border-outline/60 p-1 sm:grid-cols-4">
+            {(
+              [
+                ["nome", "Nome"],
+                ["zona", "Zona"],
+                ["email", "Email"],
+                ["password", "Palavra-passe"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => {
+                  setSection(key);
+                  setMenuOpen(false);
+                }}
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                  section === key
+                    ? "bg-brand/10 text-brand"
+                    : "text-ink/80 hover:bg-brand/10 hover:text-brand"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {section === null && (
+          <p className="mt-4 text-sm text-ink/50">
+            Toca no avatar para alterares o nome, a zona, o email ou a palavra-passe.
+          </p>
+        )}
+
+        {section === "nome" && (
+          <form onSubmit={saveProfile} className="mt-4 space-y-3">
             <div>
-              <label htmlFor="district" className="mb-1 block text-sm font-medium text-ink">Distrito</label>
-              <input id="district" className="input" value={district} onChange={(e) => setDistrict(e.target.value)} />
+              <label htmlFor="name" className="mb-1 block text-sm font-medium text-ink">Nome</label>
+              <input id="name" className="input" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <button type="submit" className="btn-primary" disabled={savingProfile}>
+              {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Guardar nome
+            </button>
+            <Feedback msg={profileMsg} />
+          </form>
+        )}
+
+        {section === "zona" && (
+          <form onSubmit={saveProfile} className="mt-4 space-y-3">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="district" className="mb-1 block text-sm font-medium text-ink">Distrito</label>
+                <input id="district" className="input" value={district} onChange={(e) => setDistrict(e.target.value)} />
+              </div>
+              <div>
+                <label htmlFor="city" className="mb-1 block text-sm font-medium text-ink">Cidade</label>
+                <input id="city" className="input" value={city} onChange={(e) => setCity(e.target.value)} />
+              </div>
+            </div>
+            <p className="text-xs text-ink/50">A zona define o folheto regional do Aldi.</p>
+            <button type="submit" className="btn-primary" disabled={savingProfile}>
+              {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Guardar zona
+            </button>
+            <Feedback msg={profileMsg} />
+          </form>
+        )}
+
+        {section === "email" && (
+          <form onSubmit={changeEmail} className="mt-4 space-y-3">
+            <div>
+              <label htmlFor="newEmail" className="mb-1 block text-sm font-medium text-ink">Novo email</label>
+              <input id="newEmail" type="email" className="input" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} required />
             </div>
             <div>
-              <label htmlFor="city" className="mb-1 block text-sm font-medium text-ink">Cidade</label>
-              <input id="city" className="input" value={city} onChange={(e) => setCity(e.target.value)} />
+              <label htmlFor="emailPwd" className="mb-1 block text-sm font-medium text-ink">Palavra-passe atual</label>
+              <input id="emailPwd" type="password" autoComplete="current-password" className="input" value={emailPwd} onChange={(e) => setEmailPwd(e.target.value)} required />
             </div>
-          </div>
-          <p className="text-xs text-ink/50">A zona define o folheto regional do Aldi.</p>
-          <button type="submit" className="btn-primary" disabled={savingProfile}>
-            {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Guardar perfil
-          </button>
-          <Feedback msg={profileMsg} />
-        </form>
-      </section>
+            <button type="submit" className="btn-primary" disabled={savingEmail || !emailPwd || newEmail === me?.email}>
+              {savingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Alterar email
+            </button>
+            <Feedback msg={emailMsg} />
+          </form>
+        )}
 
-      {/* Email */}
-      <section className="rounded-2xl border border-outline/60 bg-white p-6">
-        <h2 className="font-semibold text-ink">Alterar email</h2>
-        <form onSubmit={changeEmail} className="mt-4 space-y-4">
-          <div>
-            <label htmlFor="newEmail" className="mb-1 block text-sm font-medium text-ink">Novo email</label>
-            <input id="newEmail" type="email" className="input" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} required />
-          </div>
-          <div>
-            <label htmlFor="emailPwd" className="mb-1 block text-sm font-medium text-ink">Palavra-passe atual</label>
-            <input id="emailPwd" type="password" autoComplete="current-password" className="input" value={emailPwd} onChange={(e) => setEmailPwd(e.target.value)} required />
-          </div>
-          <button type="submit" className="btn-primary" disabled={savingEmail || !emailPwd || newEmail === me?.email}>
-            {savingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-            Alterar email
-          </button>
-          <Feedback msg={emailMsg} />
-        </form>
-      </section>
-
-      {/* Palavra-passe */}
-      <section className="rounded-2xl border border-outline/60 bg-white p-6">
-        <h2 className="font-semibold text-ink">Alterar palavra-passe</h2>
-        <form onSubmit={changePassword} className="mt-4 space-y-4">
-          <div>
-            <label htmlFor="curPwd" className="mb-1 block text-sm font-medium text-ink">Palavra-passe atual</label>
-            <input id="curPwd" type="password" autoComplete="current-password" className="input" value={curPwd} onChange={(e) => setCurPwd(e.target.value)} required />
-          </div>
-          <div>
-            <label htmlFor="newPwd" className="mb-1 block text-sm font-medium text-ink">Nova palavra-passe (mín. 8)</label>
-            <input id="newPwd" type="password" autoComplete="new-password" className="input" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} required />
-          </div>
-          <button type="submit" className="btn-primary" disabled={savingPwd || !curPwd || newPwd.length < 8}>
-            {savingPwd ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-            Alterar palavra-passe
-          </button>
-          <Feedback msg={pwdMsg} />
-        </form>
+        {section === "password" && (
+          <form onSubmit={changePassword} className="mt-4 space-y-3">
+            <div>
+              <label htmlFor="curPwd" className="mb-1 block text-sm font-medium text-ink">Palavra-passe atual</label>
+              <input id="curPwd" type="password" autoComplete="current-password" className="input" value={curPwd} onChange={(e) => setCurPwd(e.target.value)} required />
+            </div>
+            <div>
+              <label htmlFor="newPwd" className="mb-1 block text-sm font-medium text-ink">Nova palavra-passe (mín. 8)</label>
+              <input id="newPwd" type="password" autoComplete="new-password" className="input" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} required />
+            </div>
+            <button type="submit" className="btn-primary" disabled={savingPwd || !curPwd || newPwd.length < 8}>
+              {savingPwd ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+              Alterar palavra-passe
+            </button>
+            <Feedback msg={pwdMsg} />
+          </form>
+        )}
       </section>
 
       {/* Privacidade e dados (RGPD) */}

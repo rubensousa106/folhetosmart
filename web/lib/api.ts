@@ -26,7 +26,7 @@ export type ShoppingItem = {
   updated_at?: string;
 };
 
-/** Oferta vinda do feed /api/v1/products/all (snake_case do produtor). */
+/** Oferta servida por /api/v1/products/offerings e /highlights (snake_case). */
 export type FlyerOffering = {
   produto: string;
   preco: number;
@@ -194,50 +194,22 @@ export async function forgotPassword(email: string) {
 
 // --- feed de produtos -------------------------------------------------------
 
-/** True se a validade ("… a DD/MM/AAAA") já terminou. */
-export function isExpired(validade?: string): boolean {
-  const fim = validade?.split(" a ").pop()?.trim();
-  if (!fim) return false;
-  const m = fim.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (!m) return false;
-  const end = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return end < today;
-}
-
-/** Descarrega um feed do R2 (link assinado, origem externa). */
-async function downloadFeed(url: string): Promise<FlyerOffering[]> {
-  const res = await fetch(url);
-  if (!res.ok) throw new ApiError(res.status, "Feed indisponível");
-  return (await res.json()) as FlyerOffering[];
-}
-
 /**
- * Ofertas válidas de todos os supermercados. Espelha a app: lê os feeds ativos
- * (GET /products/feeds → links assinados R2) e funde-os; recorre a /products/all
- * (302 → R2) se os feeds falharem. Filtra as validades já expiradas.
+ * Ofertas de todos os supermercados para o "Comparar".
  *
- * Nota: os ficheiros de feed vivem no R2 (origem externa). Para o browser os
- * poder ler, o bucket R2 precisa de uma regra CORS que permita o domínio do site.
+ * A web usa o endpoint AUTENTICADO /api/v1/products/offerings: o backend constrói
+ * a lista a partir da BD e devolve-a pronta. Ao contrário da app Android, o
+ * browser NÃO descarrega o .json do R2 — não expõe o ficheiro nem os links
+ * assinados (cópia mais difícil) e dispensa CORS no R2.
+ *
+ * O backend é a ÚNICA fonte de verdade: mostramos exatamente o mesmo que o teaser
+ * "Ofertas da semana" (/highlights). NÃO filtramos validades aqui no cliente — se
+ * filtrássemos só aqui, o Comparar ficava vazio com dados expirados enquanto o
+ * teaser os mostrava (foi o bug). Se um dia quisermos esconder folhetos expirados,
+ * faz-se UMA vez no backend, para os dois nunca divergirem.
  */
 export async function fetchOfferings(): Promise<FlyerOffering[]> {
-  let merged: FlyerOffering[] = [];
-  try {
-    const feeds = await apiFetch<string[]>("/api/v1/products/feeds");
-    if (feeds.length > 0) {
-      const lists = await Promise.all(
-        feeds.map((url) => downloadFeed(url).catch(() => [] as FlyerOffering[])),
-      );
-      merged = lists.flat();
-    }
-  } catch {
-    /* sem /feeds — tenta o endpoint único abaixo */
-  }
-  if (merged.length === 0) {
-    merged = await apiFetch<FlyerOffering[]>("/api/v1/products/all");
-  }
-  return merged.filter((o) => !isExpired(o.validade));
+  return apiFetch<FlyerOffering[]>("/api/v1/products/offerings");
 }
 
 /** Amostra PÚBLICA de ofertas da semana (isco do site) — sem login. */
@@ -309,4 +281,25 @@ export const privacy = {
   },
   /** Elimina a conta e todos os dados (Art. 17.º) — irreversível. */
   deleteAccount: () => apiFetch<void>("/api/v1/privacy/my-account", { method: "DELETE" }),
+};
+
+// --- administração (apenas ADMIN; o backend devolve 403 a outros) -----------
+
+export type FlyerStatus = {
+  name: string;
+  slug: string;
+  has_flyer: boolean;
+  drive_filename: string | null;
+  products_imported: number;
+  synced_at: string | null;
+};
+
+export type FlyersStatus = {
+  week: string;
+  supermarkets: FlyerStatus[];
+};
+
+export const admin = {
+  /** Estado dos folhetos da semana atual (GET /api/v1/admin/flyers/status). */
+  flyersStatus: () => apiFetch<FlyersStatus>("/api/v1/admin/flyers/status"),
 };
