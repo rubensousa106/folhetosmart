@@ -12,4 +12,6 @@ export const AD_SLOTS = {
   railRight: "",
   /** Banner horizontal dentro do /app (só para utilizadores USER, não ADMIN). */
   appInline: "",
+  /** Banner horizontal intercalado na lista do Comparar (a cada ~6 produtos). */
+  compararInline: "",
 };

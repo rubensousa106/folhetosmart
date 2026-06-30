@@ -123,7 +123,7 @@ fun FolhetoSmartRoot(
             startDestination = Destination.Compare.route,
             modifier = Modifier.padding(padding)
         ) {
-            composable(Destination.Compare.route) { CompareScreen() }
+            composable(Destination.Compare.route) { CompareScreen(isAdmin = isAdmin) }
             composable(Destination.ShoppingList.route) { ListScreen() }
             composable(Destination.Sync.route) {
                 // A lista de supermercados está sempre visível; o ADMIN tem a

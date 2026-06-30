@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Search, Star, Plus, Check, Loader2, AlertCircle } from "lucide-react";
 import {
   fetchOfferings,
@@ -8,6 +8,9 @@ import {
   type FlyerOffering,
   ApiError,
 } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { AdUnit } from "@/components/AdSense";
+import { AD_SLOTS } from "@/lib/ads";
 
 const MAX_GROUPS = 60;
 
@@ -41,6 +44,8 @@ function eur(v: number) {
 }
 
 export default function CompararPage() {
+  const { session } = useAuth();
+  const showAds = session?.role !== "ADMIN"; // ADMIN não vê anúncios
   const [offerings, setOfferings] = useState<FlyerOffering[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -138,8 +143,9 @@ export default function CompararPage() {
           )}
 
           <ul className="mt-4 space-y-4">
-            {filtered.map((g) => (
-              <li key={g.produto} className="rounded-2xl border border-outline/60 bg-white p-4">
+            {filtered.map((g, idx) => (
+              <Fragment key={g.produto}>
+                <li className="rounded-2xl border border-outline/60 bg-white p-4">
                 <h2 className="font-semibold text-ink">{g.produto}</h2>
                 <ul className="mt-3 space-y-2">
                   {g.offers.map((o, i) => {
@@ -181,7 +187,17 @@ export default function CompararPage() {
                     );
                   })}
                 </ul>
-              </li>
+                </li>
+                {/* Banner intercalado a cada ~6 produtos (só USER, e só se o slot existir) */}
+                {showAds &&
+                  AD_SLOTS.compararInline &&
+                  (idx + 1) % 6 === 0 &&
+                  idx + 1 < filtered.length && (
+                    <li>
+                      <AdUnit slot={AD_SLOTS.compararInline} format="horizontal" />
+                    </li>
+                  )}
+              </Fragment>
             ))}
           </ul>
 

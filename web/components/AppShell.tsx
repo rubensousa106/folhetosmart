@@ -67,6 +67,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
+      {/* Anúncios laterais (verticais) — só USER, em ecrãs largos com margem */}
+      {session.role !== "ADMIN" && (
+        <>
+          <aside className="fixed left-2 top-1/2 z-10 hidden -translate-y-1/2 xl:block" aria-hidden="true">
+            <AdUnit slot={AD_SLOTS.railLeft} format="vertical" responsive={false} style={{ width: 160, height: 600 }} />
+          </aside>
+          <aside className="fixed right-2 top-1/2 z-10 hidden -translate-y-1/2 xl:block" aria-hidden="true">
+            <AdUnit slot={AD_SLOTS.railRight} format="vertical" responsive={false} style={{ width: 160, height: 600 }} />
+          </aside>
+        </>
+      )}
+
       <main className="container-page flex-1 py-6">{children}</main>
 
       {/* Anúncio — só para utilizadores USER (o ADMIN não vê anúncios) */}

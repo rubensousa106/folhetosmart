@@ -22,7 +22,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -177,14 +181,41 @@ public class ProductController {
 
     /**
      * GET /api/v1/products/highlights — amostra PÚBLICA (até 8) de ofertas da
-     * semana, para o "isco" do site (visitantes sem sessão). Limitada e variada
-     * de propósito — NÃO é a base completa (essa é privada/autenticada).
+     * semana, para o "isco" do site (visitantes sem sessão). Dá PRIORIDADE aos
+     * produtos comparados em vários supermercados (onde a poupança se vê) e mostra,
+     * de cada um, a oferta MAIS BARATA. Variada de propósito — NÃO é a base completa
+     * (essa é privada/autenticada, em /offerings).
      */
     @GetMapping("/highlights")
     public List<FlyerOfferingDto> highlights() {
-        List<FlyerOfferingDto> offerings = buildOfferingsFromDb();
-        Collections.shuffle(offerings);
-        return offerings.stream().limit(8).toList();
+        // Agrupa as ofertas por produto (nome canónico).
+        Map<String, List<FlyerOfferingDto>> porProduto = new LinkedHashMap<>();
+        for (FlyerOfferingDto o : buildOfferingsFromDb()) {
+            porProduto.computeIfAbsent(o.produto(), k -> new ArrayList<>()).add(o);
+        }
+
+        // Por produto: nº de supermercados distintos + a oferta mais barata (a "marcada").
+        record Destaque(int mercados, FlyerOfferingDto maisBarata) {}
+        List<Destaque> destaques = new ArrayList<>();
+        for (List<FlyerOfferingDto> ofertas : porProduto.values()) {
+            Set<String> mercados = new HashSet<>();
+            FlyerOfferingDto maisBarata = null;
+            for (FlyerOfferingDto o : ofertas) {
+                mercados.add(o.supermercado());
+                if (maisBarata == null || o.preco() < maisBarata.preco()) {
+                    maisBarata = o;
+                }
+            }
+            destaques.add(new Destaque(mercados.size(), maisBarata));
+        }
+
+        // Baralha (varia entre visitas) e ordena por nº de supermercados desc — a
+        // ordenação é estável, por isso os produtos em mais lojas vêm primeiro e o
+        // baralhamento mantém-se dentro de cada nível. Devolve a oferta mais barata
+        // de cada produto (até 8).
+        Collections.shuffle(destaques);
+        destaques.sort((a, b) -> Integer.compare(b.mercados(), a.mercados()));
+        return destaques.stream().limit(8).map(Destaque::maisBarata).toList();
     }
 
     /**

@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.Search
@@ -44,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.folhetosmart.data.models.FlyerOfferingDto
+import com.folhetosmart.ui.ads.AdmobBanner
 import com.folhetosmart.ui.components.EmptyView
 import com.folhetosmart.ui.components.ErrorView
 import com.folhetosmart.ui.components.LoadingView
@@ -56,7 +56,10 @@ import com.folhetosmart.ui.theme.FolhetoSmartGreen
  * ⭐). Carrinho ou deslizar para a esquerda adiciona à Lista de compras.
  */
 @Composable
-fun CompareScreen(viewModel: CompareViewModel = viewModel(factory = CompareViewModel.Factory)) {
+fun CompareScreen(
+    isAdmin: Boolean = false,
+    viewModel: CompareViewModel = viewModel(factory = CompareViewModel.Factory)
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
@@ -99,10 +102,16 @@ fun CompareScreen(viewModel: CompareViewModel = viewModel(factory = CompareViewM
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(s.groups, key = { it.produto }) { group ->
-                        ProductGroupCard(group, onAdd = { offer ->
-                            viewModel.addOffer(group.produto, offer.supermercado, offer.preco)
-                        })
+                    s.groups.forEachIndexed { index, group ->
+                        item(key = group.produto) {
+                            ProductGroupCard(group, onAdd = { offer ->
+                                viewModel.addOffer(group.produto, offer.supermercado, offer.preco)
+                            })
+                        }
+                        // Banner AdMob a cada ~6 produtos — só USER (o ADMIN não vê); nunca após o último.
+                        if (!isAdmin && (index + 1) % 6 == 0 && index + 1 < s.groups.size) {
+                            item(key = "ad-$index") { AdmobBanner() }
+                        }
                     }
                 }
             }
