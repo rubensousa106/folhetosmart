@@ -39,6 +39,7 @@ import com.folhetosmart.features.legal.PrivacyPolicyScreen
 import com.folhetosmart.features.legal.TermsOfServiceScreen
 import com.folhetosmart.ui.DistritoCidadeFields
 import com.folhetosmart.ui.Validators
+import com.folhetosmart.ui.components.BrandBadge
 import com.folhetosmart.ui.components.ValidatedTextField
 
 /**
@@ -163,6 +164,8 @@ private fun AccountStep(
             .padding(24.dp),
         verticalArrangement = Arrangement.Center
     ) {
+        BrandBadge()
+        Spacer(Modifier.height(16.dp))
         Text(
             "Criar conta",
             style = MaterialTheme.typography.headlineSmall,
@@ -277,6 +280,8 @@ private fun LocationStep(
             .padding(24.dp),
         verticalArrangement = Arrangement.Center
     ) {
+        BrandBadge()
+        Spacer(Modifier.height(16.dp))
         Text(
             "A tua zona",
             style = MaterialTheme.typography.headlineSmall,

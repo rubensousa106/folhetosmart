@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.folhetosmart.ui.Validators
+import com.folhetosmart.ui.components.BrandBadge
 import com.folhetosmart.ui.components.ValidatedTextField
 
 /**
@@ -64,7 +65,8 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("🛒", style = MaterialTheme.typography.displayMedium)
+        BrandBadge(size = 64.dp)
+        Spacer(Modifier.height(12.dp))
         Text(
             "FolhetoSmart",
             style = MaterialTheme.typography.headlineMedium,

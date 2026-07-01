@@ -46,7 +46,7 @@ export default function OfertasPage() {
         <WeekHighlights />
       </div>
 
-      <section className="mt-12 rounded-3xl bg-brand px-6 py-12 text-center text-white">
+      <section className="mt-12 rounded-3xl bg-brand-gradient px-6 py-12 text-center text-white">
         <h2 className="text-2xl font-bold">Vê todas as ofertas e poupa</h2>
         <p className="mx-auto mt-3 max-w-xl text-white/80">
           Compara os folhetos do Lidl, Continente, Pingo Doce, Intermarché e Aldi e

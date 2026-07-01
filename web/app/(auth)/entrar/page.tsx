@@ -70,7 +70,7 @@ export default function EntrarPage() {
 
   if (mustChange) {
     return (
-      <div className="rounded-2xl border border-outline/60 bg-white p-8 shadow-sm">
+      <div className="card-elevated rounded-2xl border border-outline/60 bg-white p-8">
         <h1 className="text-2xl font-bold text-ink">Definir nova palavra-passe</h1>
         <p className="mt-1 text-sm text-ink/70">
           Entraste com uma palavra-passe temporária. Define agora a tua nova palavra-passe.
@@ -112,7 +112,7 @@ export default function EntrarPage() {
   }
 
   return (
-    <div className="rounded-2xl border border-outline/60 bg-white p-8 shadow-sm">
+    <div className="card-elevated rounded-2xl border border-outline/60 bg-white p-8">
       <h1 className="text-2xl font-bold text-ink">Entrar</h1>
       <p className="mt-1 text-sm text-ink/70">
         Acede à comparação de preços e à tua lista de compras.

@@ -29,6 +29,18 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
       },
+      // Sombras com tom de marca (em vez de cinza genérico) — usadas com
+      // moderação em cards de destaque (ver .card-elevated em globals.css).
+      boxShadow: {
+        elevated:
+          "0 4px 16px -2px rgba(27,94,32,0.12), 0 2px 6px -2px rgba(27,94,32,0.08)",
+        floating:
+          "0 16px 40px -8px rgba(27,94,32,0.20), 0 6px 16px -4px rgba(27,94,32,0.10)",
+      },
+      // Gradiente subtil de marca — só para heros/CTAs finais, não em tudo.
+      backgroundImage: {
+        "brand-gradient": "linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%)",
+      },
     },
   },
   plugins: [],

@@ -121,7 +121,7 @@ export default function PouparPage() {
 
       <div className="mt-10 grid gap-6 md:grid-cols-2">
         {TIPS.map((t) => (
-          <section key={t.title} className="rounded-2xl border border-outline/60 bg-white p-6">
+          <section key={t.title} className="card-elevated rounded-2xl border border-outline/60 bg-white p-6">
             <span className="grid h-11 w-11 place-items-center rounded-xl bg-savings-bg text-brand">
               <t.icon className="h-6 w-6" />
             </span>
@@ -143,7 +143,7 @@ export default function PouparPage() {
               href={`/supermercados/${s.slug}/`}
               className="rounded-full border border-outline bg-white px-5 py-2.5 font-medium text-ink transition hover:border-brand hover:text-brand"
             >
-              Folheto {s.name}
+              {s.name}
             </Link>
           ))}
         </div>
@@ -166,7 +166,7 @@ export default function PouparPage() {
       </section>
 
       {/* CTA */}
-      <section className="mt-12 rounded-3xl bg-brand px-6 py-12 text-center text-white">
+      <section className="mt-12 rounded-3xl bg-brand-gradient px-6 py-12 text-center text-white">
         <h2 className="text-2xl font-bold">Começa a poupar esta semana</h2>
         <p className="mx-auto mt-3 max-w-xl text-white/80">
           Cria a tua conta gratuita e compara os folhetos de {SITE.name} em segundos.

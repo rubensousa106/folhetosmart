@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -59,6 +60,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.folhetosmart.data.api.AdminFlyerStatusDto
 import com.folhetosmart.ui.components.Formatters
 import com.folhetosmart.ui.theme.ErrorRed
+import com.folhetosmart.ui.theme.FolhetoElevation
 import com.folhetosmart.ui.theme.FolhetoSmartGreen
 import com.folhetosmart.ui.theme.SavingsBadge
 import com.folhetosmart.ui.theme.WaitingGrey
@@ -134,7 +136,10 @@ fun AdminScreen(
 /** Tracker (✓/✗) dos produtos por supermercado, com base no feed real. */
 @Composable
 private fun FeedTrackerCard(state: AdminUiState, onReload: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = FolhetoElevation.card)
+    ) {
         Column(
             Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -212,7 +217,10 @@ private fun UploadCard(
     onUpload: () -> Unit,
     onRetry: () -> Unit
 ) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = FolhetoElevation.card)
+    ) {
         Column(
             Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)

@@ -47,10 +47,13 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.material3.CardDefaults
 import com.folhetosmart.ui.DistritoCidadeFields
 import com.folhetosmart.ui.UserAvatar
 import com.folhetosmart.ui.Validators
+import com.folhetosmart.ui.components.CrossPlatformPromo
 import com.folhetosmart.ui.components.ValidatedTextField
+import com.folhetosmart.ui.theme.FolhetoElevation
 import kotlinx.coroutines.delay
 
 /** Ecrã Definições — conta (perfil) + privacidade e dados (RGPD). */
@@ -106,7 +109,10 @@ fun SettingsScreen(
             )
         }
 
-        Card(Modifier.fillMaxWidth()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(defaultElevation = FolhetoElevation.card)
+        ) {
             Column(Modifier.padding(16.dp)) {
                 Text(
                     "Privacidade e Dados",
@@ -174,13 +180,19 @@ fun SettingsScreen(
                     label = "Termos de Utilização",
                     onClick = onOpenTerms
                 )
+
+                HorizontalDivider(Modifier.padding(vertical = 12.dp))
+                CrossPlatformPromo()
             }
         }
 
         state.message?.let {
             // Confirmação — desaparece sozinha. Removido o botão "OK": ficava colado
             // ao "Sair" e um duplo toque por engano terminava a sessão.
-            Card(Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = FolhetoElevation.card)
+            ) {
                 Text(
                     it,
                     style = MaterialTheme.typography.bodyMedium,
@@ -252,7 +264,10 @@ private fun AccountCard(
     var menuOpen by remember { mutableStateOf(false) }
     var section by remember { mutableStateOf<String?>(null) }
 
-    Card(Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = FolhetoElevation.cardHighlighted)
+    ) {
         Column(Modifier.padding(16.dp)) {
             // Cabeçalho: avatar (animal do utilizador) + nome/email + menu de edição.
             Row(verticalAlignment = Alignment.CenterVertically) {

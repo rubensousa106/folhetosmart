@@ -44,7 +44,7 @@ export default function RecuperarPage() {
   }
 
   return (
-    <div className="rounded-2xl border border-outline/60 bg-white p-8 shadow-sm">
+    <div className="card-elevated rounded-2xl border border-outline/60 bg-white p-8">
       <h1 className="text-2xl font-bold text-ink">Recuperar palavra-passe</h1>
       <p className="mt-1 text-sm text-ink/70">
         Indica o teu email e enviamos-te instruções para a repor.

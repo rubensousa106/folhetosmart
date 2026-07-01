@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Smartphone } from "lucide-react";
 import { Brand } from "./Brand";
 import { SITE, SUPERMARKETS } from "@/lib/site";
 
@@ -21,7 +22,7 @@ export function SiteFooter() {
             {SUPERMARKETS.map((s) => (
               <li key={s.slug}>
                 <Link href={`/supermercados/${s.slug}/`} className="hover:text-brand">
-                  Folheto {s.name}
+                  {s.name}
                 </Link>
               </li>
             ))}
@@ -38,8 +39,13 @@ export function SiteFooter() {
             <li><Link href="/entrar/" className="hover:text-brand">Entrar</Link></li>
             <li><Link href="/registar/" className="hover:text-brand">Criar conta</Link></li>
             <li>
-              <a href={SITE.playStoreUrl} className="hover:text-brand" rel="noopener">
-                App Android
+              <a
+                href={SITE.playStoreUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 hover:text-brand"
+              >
+                <Smartphone className="h-3.5 w-3.5" /> App Android
               </a>
             </li>
           </ul>

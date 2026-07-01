@@ -20,8 +20,8 @@ export function generateMetadata({
   const sm = getSupermarket(params.slug);
   if (!sm) return {};
   return pageMetadata({
-    title: `Folheto ${sm.name} — comparar preços e promoções`,
-    description: `${sm.blurb} Vê o folheto ${sm.name} da semana e compara com Lidl, Continente, Pingo Doce, Intermarché e Aldi no FolhetoSmart.`,
+    title: `${sm.name}: comparar preços e promoções`,
+    description: `${sm.blurb} Compara os preços do folheto ${sm.name} desta semana com Lidl, Continente, Pingo Doce, Intermarché e Aldi no FolhetoSmart.`,
     path: `/supermercados/${sm.slug}`,
     keywords: [
       `folheto ${sm.name}`,
@@ -63,22 +63,22 @@ export default function SupermercadoPage({
       <JsonLd
         data={breadcrumbJsonLd([
           { name: "Início", path: "/" },
-          { name: `Folheto ${sm.name}`, path: `/supermercados/${sm.slug}` },
+          { name: sm.name, path: `/supermercados/${sm.slug}` },
         ])}
       />
       <div className="container-page max-w-3xl py-12 sm:py-16">
         <nav className="text-sm text-ink/60">
           <Link href="/" className="hover:text-brand">Início</Link>
           <span className="px-2">/</span>
-          <span>Folheto {sm.name}</span>
+          <span>{sm.name}</span>
         </nav>
 
         <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
-          Folheto {sm.name} — comparar preços e promoções
+          {sm.name}: comparar preços e promoções
         </h1>
         <p className="mt-4 text-lg text-ink/70">{sm.blurb}</p>
 
-        <div className="mt-10 rounded-2xl bg-savings-bg p-6">
+        <div className="card-elevated mt-10 rounded-2xl bg-savings-bg p-6">
           <h2 className="text-lg font-bold text-brand-dark">
             Compara o {sm.name} com os outros supermercados
           </h2>
@@ -136,7 +136,7 @@ export default function SupermercadoPage({
                 href={`/supermercados/${o.slug}/`}
                 className="rounded-full border border-outline bg-white px-4 py-2 text-sm font-medium text-ink hover:border-brand hover:text-brand"
               >
-                Folheto {o.name}
+                {o.name}
               </Link>
             ))}
           </div>

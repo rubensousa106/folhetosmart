@@ -39,6 +39,7 @@ import com.folhetosmart.data.api.AlertDto
 import com.folhetosmart.ui.components.EmptyView
 import com.folhetosmart.ui.components.Formatters
 import com.folhetosmart.ui.components.LoadingView
+import com.folhetosmart.ui.theme.FolhetoElevation
 
 /** Ecrã Alertas: sessão + gestão de alertas de preço. */
 @Composable
@@ -215,7 +216,8 @@ private fun NewProductsBanner(onGoToSync: () -> Unit) {
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        )
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = FolhetoElevation.cardHighlighted)
     ) {
         Column(
             Modifier.padding(16.dp),
@@ -239,7 +241,10 @@ private fun NewProductsBanner(onGoToSync: () -> Unit) {
 
 @Composable
 private fun AlertRow(alert: AlertDto, onDelete: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = FolhetoElevation.card)
+    ) {
         Row(
             Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically

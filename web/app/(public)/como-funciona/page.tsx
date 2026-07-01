@@ -55,7 +55,7 @@ export default function ComoFuncionaPage() {
 
       <ol className="mt-10 space-y-6">
         {SECTIONS.map((s, i) => (
-          <li key={s.title} className="flex gap-4 rounded-2xl border border-outline/60 bg-white p-6">
+          <li key={s.title} className="card-elevated flex gap-4 rounded-2xl border border-outline/60 bg-white p-6">
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-savings-bg text-brand">
               <s.icon className="h-6 w-6" />
             </span>
@@ -69,7 +69,7 @@ export default function ComoFuncionaPage() {
         ))}
       </ol>
 
-      <div className="mt-10 flex flex-col items-center gap-3 rounded-2xl bg-brand p-8 text-center text-white">
+      <div className="mt-10 flex flex-col items-center gap-3 rounded-2xl bg-brand-gradient p-8 text-center text-white">
         <h2 className="text-xl font-bold">Pronto para poupar?</h2>
         <p className="max-w-md text-white/80">
           Cria a tua conta gratuita e acede já à comparação de preços desta semana.

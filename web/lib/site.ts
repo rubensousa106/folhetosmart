@@ -57,7 +57,7 @@ export const SUPERMARKETS: Supermarket[] = [
     name: "Lidl",
     flyerDay: "segunda-feira",
     blurb:
-      "Vê o folheto Lidl da semana e compara os preços com os outros supermercados antes de ires às compras.",
+      "Compara os preços do folheto Lidl desta semana com os outros supermercados antes de ires às compras.",
   },
   {
     slug: "continente",

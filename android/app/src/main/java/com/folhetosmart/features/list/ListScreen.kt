@@ -33,6 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.folhetosmart.data.local.ShoppingItemEntity
 import com.folhetosmart.ui.components.EmptyView
+import com.folhetosmart.ui.theme.FolhetoElevation
 import com.folhetosmart.ui.theme.FolhetoSmartGreen
 import com.folhetosmart.ui.theme.SavingsBadge
 
@@ -111,7 +112,8 @@ fun ListScreen(viewModel: ListViewModel = viewModel(factory = ListViewModel.Fact
 private fun TotalsCard(totals: ListTotals) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = SavingsBadge)
+        colors = CardDefaults.cardColors(containerColor = SavingsBadge),
+        elevation = CardDefaults.cardElevation(defaultElevation = FolhetoElevation.cardHighlighted)
     ) {
         Column(Modifier.padding(16.dp)) {
             Text(
@@ -167,7 +169,10 @@ private fun ShoppingItemRow(
     onDecrease: () -> Unit,
     onRemove: () -> Unit
 ) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = FolhetoElevation.card)
+    ) {
         Row(
             Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically

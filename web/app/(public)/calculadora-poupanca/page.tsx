@@ -66,7 +66,7 @@ export default function CalculadoraPage() {
         </p>
       </section>
 
-      <section className="mt-10 rounded-3xl bg-brand px-6 py-12 text-center text-white">
+      <section className="mt-10 rounded-3xl bg-brand-gradient px-6 py-12 text-center text-white">
         <h2 className="text-2xl font-bold">Transforma a estimativa em poupança real</h2>
         <p className="mx-auto mt-3 max-w-xl text-white/80">
           Cria a tua conta gratuita e compara os preços reais desta semana em segundos.

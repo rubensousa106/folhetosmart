@@ -49,7 +49,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.folhetosmart.features.admin.AdminUploadSheet
 import com.folhetosmart.ui.components.ErrorView
 import com.folhetosmart.ui.components.LoadingView
+import androidx.compose.material3.CardDefaults
 import com.folhetosmart.ui.theme.ErrorRed
+import com.folhetosmart.ui.theme.FolhetoElevation
 import com.folhetosmart.ui.theme.FolhetoSmartGreen
 
 /**
@@ -134,7 +136,10 @@ private fun SyncContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Card(Modifier.fillMaxWidth()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(defaultElevation = FolhetoElevation.cardHighlighted)
+        ) {
             Column(
                 Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)

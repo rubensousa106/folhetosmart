@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.AddShoppingCart
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +49,7 @@ import com.folhetosmart.ui.components.EmptyView
 import com.folhetosmart.ui.components.ErrorView
 import com.folhetosmart.ui.components.LoadingView
 import com.folhetosmart.ui.theme.ErrorRed
+import com.folhetosmart.ui.theme.FolhetoElevation
 import com.folhetosmart.ui.theme.FolhetoSmartGreen
 
 /**
@@ -93,7 +95,7 @@ fun CompareScreen(
                 is CompareUiState.Empty -> EmptyView(
                     emoji = if (s.query.isEmpty()) "🛒" else "🤷",
                     message = if (s.query.isEmpty())
-                        "Ainda não há produtos.\nOs folhetos são atualizados às quintas."
+                        "Ainda não há produtos.\nCada supermercado atualiza o folheto no seu próprio dia."
                     else
                         "Sem resultados para “${s.query}”.\nExperimenta outro termo."
                 )
@@ -126,7 +128,12 @@ fun CompareScreen(
 
 @Composable
 private fun ProductGroupCard(group: ProductGroup, onAdd: (FlyerOfferingDto) -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+    // Comparação de vários supermercados merece um pouco mais de destaque.
+    val elevation = if (group.hasMultiple) FolhetoElevation.cardHighlighted else FolhetoElevation.card
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = elevation)
+    ) {
         Column(Modifier.padding(14.dp)) {
             Text(
                 group.produto,
