@@ -38,6 +38,121 @@ body {
   }
 }
 
+/* Entrada suave do hero — corre só no arranque e o estado final é visível,
+   por isso nunca "fica em branco". Desligada com prefers-reduced-motion. */
+@keyframes heroFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.hero-reveal {
+  animation: heroFadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.hero-reveal-delay {
+  animation-delay: 0.12s;
+}
+/* Sweep de marcador no título do hero — realça "mesmas compras" como uma
+   etiqueta de preço. O texto fica branco e legível mesmo sem a animação. */
+.marker-sweep::before {
+  content: "";
+  position: absolute;
+  inset: 0.08em -0.18em;
+  z-index: -1;
+  border-radius: 0.18em;
+  background: rgba(76, 175, 80, 0.45);
+  transform: scaleX(0) skewX(-3deg);
+  transform-origin: left center;
+  animation: markerSweep 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.9s both;
+}
+@keyframes markerSweep {
+  to {
+    transform: scaleX(1) skewX(-3deg);
+  }
+}
+
+/* Cursor a piscar na pesquisa da demo do hero. */
+.demo-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background-color: theme("colors.brand.DEFAULT");
+  animation: caretBlink 1s steps(1) infinite;
+}
+@keyframes caretBlink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Faixa contínua dos supermercados no fundo do hero. */
+.hero-marquee {
+  mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 12%, black 88%, transparent);
+}
+.hero-marquee-track {
+  animation: marqueeScroll 32s linear infinite;
+}
+@keyframes marqueeScroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-reveal {
+    animation: none;
+  }
+  .live-dot::after {
+    animation: none;
+  }
+  .marker-sweep::before {
+    animation: none;
+    transform: scaleX(1) skewX(-3deg);
+  }
+  .demo-caret {
+    animation: none;
+  }
+  .hero-marquee-track {
+    animation: none;
+  }
+}
+
+/* Ponto "ao vivo" do badge do hero — pulso suave a indicar dados desta semana. */
+.live-dot {
+  position: relative;
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: theme("colors.brand.light");
+}
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background-color: theme("colors.brand.light");
+  animation: liveDotPing 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes liveDotPing {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  75%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
 /* Conteúdo legal (markdown renderizado) */
 .legal h1 {
   @apply mt-0 text-3xl font-extrabold tracking-tight text-ink;

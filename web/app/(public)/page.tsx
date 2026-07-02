@@ -8,12 +8,14 @@ import {
   Star,
   Tag,
   ArrowRight,
+  Check,
 } from "lucide-react";
 import { SITE, SUPERMARKETS } from "@/lib/site";
 import { faqJsonLd } from "@/lib/seo";
 import { JsonLd } from "@/components/JsonLd";
 import { WeekHighlights } from "@/components/WeekHighlights";
 import { AppPromoSection } from "@/components/AppPromoSection";
+import { HeroLiveDemo } from "@/components/HeroLiveDemo";
 
 export const metadata: Metadata = {
   title: "Comparador de preços dos folhetos de supermercado",
@@ -76,75 +78,98 @@ const FEATURES = [
   },
 ];
 
-/** Três "cartões de preço" em leque — o da frente, verde, vence com um visto. */
-function HeroGraphic({ className = "" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 360 320" className={className} aria-hidden="true">
-      <g transform="rotate(-8 180 170)">
-        <rect x="60" y="70" width="200" height="110" rx="20" fill="#F3F5F0" stroke="#E3E6DE" />
-        <rect x="84" y="96" width="90" height="10" rx="5" fill="#C2C8BC" />
-        <rect x="84" y="120" width="60" height="22" rx="6" fill="#DCE0D8" />
-      </g>
-      <g transform="rotate(6 180 170)">
-        <rect x="70" y="90" width="200" height="110" rx="20" fill="white" stroke="#C2C8BC" />
-        <rect x="94" y="116" width="90" height="10" rx="5" fill="#C2C8BC" />
-        <rect x="94" y="140" width="60" height="22" rx="6" fill="#F3F5F0" />
-      </g>
-      <g>
-        <rect x="55" y="120" width="220" height="130" rx="22" fill="#2E7D32" />
-        <rect x="80" y="148" width="100" height="12" rx="6" fill="white" fillOpacity="0.9" />
-        <rect x="80" y="172" width="70" height="26" rx="8" fill="white" />
-        <text x="93" y="190" fontFamily="Arial, sans-serif" fontSize="16" fontWeight="700" fill="#2E7D32">
-          €
-        </text>
-        <circle cx="232" cy="150" r="20" fill="white" />
-        <path
-          d="M224 150l6 6 12-12"
-          stroke="#2E7D32"
-          strokeWidth="3.5"
-          fill="none"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </g>
-    </svg>
-  );
-}
 
 export default function HomePage() {
   return (
     <>
       <JsonLd data={faqJsonLd(FAQ)} />
 
-      {/* Hero */}
-      <section className="container-page py-16 sm:py-24">
-        <div className="mx-auto grid max-w-5xl items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="text-center lg:text-left">
-            <span className="inline-flex items-center gap-2 rounded-full bg-savings-bg px-4 py-1.5 text-sm font-medium text-brand-dark">
-              <Sparkles className="h-4 w-4" /> Folhetos de 5 supermercados num só lugar
-            </span>
-            <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-ink sm:text-5xl">
-              Compara preços e descobre onde é{" "}
-              <span className="text-brand">mais barato</span>
-            </h1>
-            <p className="mx-auto mt-5 max-w-2xl text-lg text-ink/70 lg:mx-0">
-              O FolhetoSmart compara automaticamente os folhetos semanais do Lidl,
-              Continente, Pingo Doce, Intermarché e Aldi — e diz-te, produto a
-              produto, onde compensa comprar. Poupa sempre.
-            </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
-              <Link href="/registar/" className="btn-primary w-full sm:w-auto">
-                Começar gratuitamente <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link href="/como-funciona/" className="btn-outline w-full sm:w-auto">
-                Ver como funciona
-              </Link>
+      {/* Hero — superfície verde de marca, com a demonstração viva do comparador */}
+      <section className="relative overflow-hidden bg-brand-gradient">
+        {/* Luz radial no topo — dá profundidade à superfície verde. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(50rem_28rem_at_75%_-10%,rgba(255,255,255,0.12),transparent)]"
+        />
+        <div className="container-page relative py-16 sm:py-20 lg:py-24">
+          <div className="mx-auto grid max-w-5xl items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="hero-reveal text-center lg:text-left">
+              <span className="inline-flex items-center gap-2.5 rounded-full bg-white/10 px-4 py-1.5 text-sm font-medium text-white ring-1 ring-white/25">
+                <span className="live-dot" aria-hidden="true" />
+                Folhetos desta semana já disponíveis
+              </span>
+              <h1 className="mt-6 text-balance text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl">
+                Paga menos pelas{" "}
+                <span className="marker-sweep relative whitespace-nowrap">
+                  mesmas compras
+                </span>
+              </h1>
+              <p className="mx-auto mt-5 max-w-2xl text-lg text-white/85 lg:mx-0">
+                O FolhetoSmart lê os folhetos do Lidl, Continente, Pingo Doce,
+                Intermarché e Aldi todas as semanas e diz-te, produto a produto,
+                onde está o preço mais baixo.
+              </p>
+              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
+                <Link
+                  href="/registar/"
+                  className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 font-semibold text-brand shadow-sm transition hover:-translate-y-0.5 hover:bg-white/95 active:translate-y-0 sm:w-auto"
+                >
+                  Criar conta grátis{" "}
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+                <Link
+                  href="/ofertas-da-semana/"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 font-semibold text-white ring-1 ring-white/40 transition hover:bg-white/10 sm:w-auto"
+                >
+                  Espreitar as ofertas da semana
+                </Link>
+              </div>
+              <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-white/80 lg:justify-start">
+                {[
+                  "100% gratuito",
+                  "Sem cartão, sem subscrições",
+                  "Sincroniza com a app Android",
+                ].map((t) => (
+                  <li key={t} className="inline-flex items-center gap-1.5">
+                    <Check className="h-4 w-4 shrink-0 text-savings-bg" aria-hidden="true" />
+                    {t}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-4 text-sm text-white/70">
+                Já tens conta?{" "}
+                <Link
+                  href="/entrar/"
+                  className="font-medium text-white underline underline-offset-4 hover:text-white/80"
+                >
+                  Entrar
+                </Link>
+              </p>
             </div>
-            <p className="mt-4 text-sm text-ink/60">
-              Já tens conta? <Link href="/entrar/" className="font-medium text-brand hover:underline">Entrar</Link>
-            </p>
+            <HeroLiveDemo className="hero-reveal hero-reveal-delay mx-auto w-full max-w-sm" />
           </div>
-          <HeroGraphic className="mx-auto hidden h-auto w-full max-w-sm sm:block" />
+
+          {/* Faixa com os 5 supermercados e o dia habitual de cada folheto. */}
+          <div
+            className="hero-marquee relative mx-auto mt-14 max-w-5xl overflow-hidden"
+            aria-hidden="true"
+          >
+            <div className="hero-marquee-track flex w-max">
+              {[0, 1].map((k) => (
+                <div
+                  key={k}
+                  className="flex items-center gap-10 whitespace-nowrap pr-10 text-sm text-white/60"
+                >
+                  {SUPERMARKETS.map((s) => (
+                    <span key={s.slug} className="inline-flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-white/30" />
+                      {s.name} · folheto de {s.flyerDay}
+                    </span>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 

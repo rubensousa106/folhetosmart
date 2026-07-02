@@ -1,17 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Carrinho de compras branco, centrado na zona segura do ícone adaptativo. -->
+<!-- Marca "Etiquetas a comparar": duas etiquetas de preço sobrepostas — a da
+     frente (sólida) vence a de trás (translúcida). Mesmo mark do site/favicon,
+     centrado na zona segura (~66dp centrais) do ícone adaptativo. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group
-        android:scaleX="2.2"
-        android:scaleY="2.2"
-        android:translateX="27.6"
-        android:translateY="27.6">
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M7,18c-1.1,0 -1.99,0.9 -1.99,2S5.9,22 7,22s2,-0.9 2,-2 -0.9,-2 -2,-2zM1,2v2h2l3.6,7.59 -1.35,2.45C5.08,14.32 5,14.65 5,15c0,1.1 0.9,2 2,2h12v-2L7.42,15c-0.14,0 -0.25,-0.11 -0.25,-0.25l0.03,-0.12L8.1,13h7.45c0.75,0 1.41,-0.41 1.75,-1.03L20.88,5.48C20.96,5.34 21,5.17 21,5c0,-0.55 -0.45,-1 -1,-1L5.21,4l-0.94,-2L1,2zM17,18c-1.1,0 -1.99,0.9 -1.99,2s0.89,2 1.99,2 2,-0.9 2,-2 -0.9,-2 -2,-2z" />
-    </group>
+    <!-- Etiqueta de trás (translúcida). -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.42"
+        android:pathData="M52,40 L64,28 L82,28 L82,52 L64,52 Z" />
+    <!-- Etiqueta da frente (sólida). -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,60 L44,44 L80,44 L80,80 L44,80 Z" />
+    <!-- Furo da etiqueta da frente (cor do fundo). -->
+    <path
+        android:fillColor="#2E7D32"
+        android:pathData="M42,60 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
 </vector>
